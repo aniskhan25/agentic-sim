@@ -1,0 +1,15 @@
+{
+  "scenario": "storm",
+  "steps": 4,
+  "scheduler": {
+    "policy": "fifo",
+    "max_activations_per_tick": 8
+  },
+  "execution": {
+    "backend": "mock",
+    "max_batch_size": 4
+  },
+  "storage": {
+    "mode": "memory"
+  }
+}
