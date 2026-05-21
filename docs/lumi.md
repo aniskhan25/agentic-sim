@@ -16,17 +16,32 @@ PYTHONPATH=src python3 -m agentic_sim.cli run \
 sbatch scripts/run_lumi.sh
 ```
 
+If the repository checkout is in a read-only project/application directory, put Slurm stdout and run artifacts in scratch:
+
+```bash
+mkdir -p /scratch/project_462000131/anisrahm/agentic-sim-runs/logs
+ARTIFACT_ROOT=/scratch/project_462000131/anisrahm/agentic-sim-runs \
+  sbatch --output=/scratch/project_462000131/anisrahm/agentic-sim-runs/logs/%x-%j.out scripts/run_lumi.sh
+```
+
 Useful overrides:
 
 ```bash
 CONFIG=configs/storm_scale.json STEPS=50 AGENT_REPLICAS=128 sbatch scripts/run_lumi.sh
 ```
 
+To choose a specific artifact location:
+
+```bash
+ARTIFACT_ROOT=/scratch/project_462000131/anisrahm/agentic-sim-runs \
+  sbatch --output=/scratch/project_462000131/anisrahm/agentic-sim-runs/logs/%x-%j.out scripts/run_lumi.sh
+```
+
 Each run writes:
 
 - `state.sqlite`: persisted agents, events, messages, environment state, and traces
 - `run.json`: tick results, summary, final environment snapshot, and structured traces
-- Slurm stdout under `logs/`
+- Slurm stdout under `logs/`, or under the path passed with `sbatch --output`
 
 The `simulation_tick` trace payload includes timing fields for event loading, scheduling, context building, batching, backend execution, result application, environment actions, event persistence, and total step time.
 

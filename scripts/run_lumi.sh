@@ -18,11 +18,20 @@ if [[ -d ".venv" ]]; then
   source ".venv/bin/activate"
 fi
 
-mkdir -p logs data
-
 JOB_ID="${SLURM_JOB_ID:-local}"
 CONFIG="${CONFIG:-configs/storm_scale.json}"
-RUN_DIR="${RUN_DIR:-data/lumi_run_${JOB_ID}}"
+if [[ -z "${ARTIFACT_ROOT:-}" ]]; then
+  if [[ -w "${ROOT_DIR}" ]]; then
+    ARTIFACT_ROOT="${ROOT_DIR}/data"
+  elif [[ -w "$(dirname "${ROOT_DIR}")" ]]; then
+    ARTIFACT_ROOT="$(dirname "${ROOT_DIR}")/agentic-sim-runs"
+  elif [[ -n "${SCRATCH:-}" ]]; then
+    ARTIFACT_ROOT="${SCRATCH}/agentic-sim-runs"
+  else
+    ARTIFACT_ROOT="/tmp/${USER:-agentic-sim}/agentic-sim-runs"
+  fi
+fi
+RUN_DIR="${RUN_DIR:-${ARTIFACT_ROOT}/lumi_run_${JOB_ID}}"
 STEPS="${STEPS:-}"
 AGENT_REPLICAS="${AGENT_REPLICAS:-}"
 MAX_BATCH_SIZE="${MAX_BATCH_SIZE:-}"
