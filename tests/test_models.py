@@ -1,7 +1,7 @@
 import unittest
 
-from multiagent_demo.models import AgentId, AgentProfile, AgentState, Event, EventType
-from multiagent_demo.utils.serialization import to_jsonable
+from agentic_sim.models import AgentId, AgentProfile, AgentState, Event, EventType
+from agentic_sim.utils.serialization import to_jsonable
 
 
 class ModelTests(unittest.TestCase):

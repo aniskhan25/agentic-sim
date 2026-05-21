@@ -2,10 +2,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from multiagent_demo.environment import StormEnvironment
-from multiagent_demo.models import AgentId, AgentProfile, AgentState, Event, EventType
-from multiagent_demo.state import InMemoryStateStore, SQLiteStateStore
-from multiagent_demo.utils.time import utc_now
+from agentic_sim.environment import StormEnvironment
+from agentic_sim.models import AgentId, AgentProfile, AgentState, Event, EventType
+from agentic_sim.state import InMemoryStateStore, SQLiteStateStore
+from agentic_sim.utils.time import utc_now
 
 
 class StateStoreTests(unittest.TestCase):

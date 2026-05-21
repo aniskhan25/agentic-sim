@@ -3,19 +3,19 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "multiagent-lumi-demo"
+name = "agentic-sim"
 version = "0.1.0"
-description = "Minimal event-driven multi-agent simulation runtime for LUMI experiments."
+description = "Minimal event-driven multi-agent simulation runtime for scalable experiments."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "LUMI multi-agent demo contributors" }]
+authors = [{ name = "Agentic simulation runtime contributors" }]
 dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
 [project.scripts]
-multiagent-demo = "multiagent_demo.cli:main"
+agentic-sim = "agentic_sim.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

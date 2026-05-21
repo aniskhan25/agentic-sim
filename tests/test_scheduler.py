@@ -1,8 +1,8 @@
 import unittest
 
-from multiagent_demo.models import AgentId, AgentProfile, Event, EventType
-from multiagent_demo.scheduling import FIFOScheduler, SchedulerInput
-from multiagent_demo.utils.time import utc_now
+from agentic_sim.models import AgentId, AgentProfile, Event, EventType
+from agentic_sim.scheduling import FIFOScheduler, SchedulerInput
+from agentic_sim.utils.time import utc_now
 
 
 class SchedulerTests(unittest.TestCase):

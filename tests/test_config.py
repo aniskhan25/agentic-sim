@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from multiagent_demo.config import load_config
+from agentic_sim.config import load_config
 
 
 class ConfigTests(unittest.TestCase):

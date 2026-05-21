@@ -5,7 +5,7 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from multiagent_demo.cli import main
+from agentic_sim.cli import main
 
 
 class CliTests(unittest.TestCase):

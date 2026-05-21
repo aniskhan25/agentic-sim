@@ -1,9 +1,9 @@
 import unittest
 from dataclasses import asdict
 
-from multiagent_demo.engine import create_storm_engine
-from multiagent_demo.observability import RunSummaryBuilder
-from multiagent_demo.utils.serialization import to_jsonable
+from agentic_sim.engine import create_storm_engine
+from agentic_sim.observability import RunSummaryBuilder
+from agentic_sim.utils.serialization import to_jsonable
 
 
 class ReplayTests(unittest.TestCase):

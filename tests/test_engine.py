@@ -1,6 +1,6 @@
 import unittest
 
-from multiagent_demo.engine import create_storm_engine
+from agentic_sim.engine import create_storm_engine
 
 
 class EngineTests(unittest.TestCase):

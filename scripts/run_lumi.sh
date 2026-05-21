@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=multiagent-demo
+#SBATCH --job-name=agentic-sim
 #SBATCH --account=project_462000131
 #SBATCH --partition=small
 #SBATCH --nodes=1
@@ -45,4 +45,4 @@ if [[ -n "${MAX_BATCH_SIZE}" ]]; then
   args+=(--max-batch-size "${MAX_BATCH_SIZE}")
 fi
 
-PYTHONPATH="${PYTHONPATH:-src}" python3 -m multiagent_demo.cli "${args[@]}"
+PYTHONPATH="${PYTHONPATH:-src}" python3 -m agentic_sim.cli "${args[@]}"

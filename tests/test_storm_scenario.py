@@ -1,10 +1,10 @@
 import unittest
 
-from multiagent_demo.environment import StormEnvironment
-from multiagent_demo.engine import create_storm_engine
-from multiagent_demo.models import EventType
-from multiagent_demo.observability import RunSummaryBuilder
-from multiagent_demo.utils.time import utc_now
+from agentic_sim.environment import StormEnvironment
+from agentic_sim.engine import create_storm_engine
+from agentic_sim.models import EventType
+from agentic_sim.observability import RunSummaryBuilder
+from agentic_sim.utils.time import utc_now
 
 
 class StormScenarioTests(unittest.TestCase):
