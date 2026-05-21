@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict
+from pathlib import Path
 
 from multiagent_demo.config import load_config, merge_cli
 from multiagent_demo.engine import create_storm_engine
@@ -22,6 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--sqlite-path", help="SQLite database path")
     run.add_argument("--max-activations-per-tick", type=int)
     run.add_argument("--max-batch-size", type=int)
+    run.add_argument("--max-events-per-tick", type=int)
+    run.add_argument("--agent-replicas", type=int)
+    run.add_argument("--output", help="Write full run artifact JSON to this path")
     return parser
 
 
@@ -42,6 +46,8 @@ def run_command(args: argparse.Namespace) -> int:
             "sqlite_path": args.sqlite_path,
             "max_activations_per_tick": args.max_activations_per_tick,
             "max_batch_size": args.max_batch_size,
+            "max_events_per_tick": args.max_events_per_tick,
+            "agent_replicas": args.agent_replicas,
         },
     )
     engine = create_storm_engine(
@@ -50,18 +56,25 @@ def run_command(args: argparse.Namespace) -> int:
         backend_name=config.backend,
         max_activations_per_tick=config.max_activations_per_tick,
         max_batch_size=config.max_batch_size,
+        max_events_per_tick=config.max_events_per_tick,
+        agent_replicas=config.agent_replicas,
     )
     tick_results = engine.run(config.steps)
     summary = RunSummaryBuilder().build(engine.store)
-    print(
-        json.dumps(
-            {
-                "ticks": [to_jsonable(result) for result in tick_results],
-                "summary": to_jsonable(asdict(summary)),
-            },
-            indent=2,
-        )
-    )
+    payload = {
+        "ticks": [to_jsonable(result) for result in tick_results],
+        "summary": to_jsonable(asdict(summary)),
+    }
+    if args.output:
+        artifact = {
+            **payload,
+            "environment": to_jsonable(engine.store.environment.get()),
+            "traces": [to_jsonable(trace) for trace in engine.store.traces.list()],
+        }
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(artifact, indent=2) + "\n")
+    print(json.dumps(payload, indent=2))
     return 0
 
 

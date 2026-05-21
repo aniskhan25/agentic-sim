@@ -14,6 +14,8 @@ class RuntimeConfig:
     sqlite_path: str = "data/storm.sqlite"
     max_activations_per_tick: int = 8
     max_batch_size: int = 4
+    max_events_per_tick: int = 32
+    agent_replicas: int = 1
 
 
 def load_config(path: str | None) -> RuntimeConfig:
@@ -29,6 +31,10 @@ def load_config(path: str | None) -> RuntimeConfig:
             data.get("scheduler", {}).get("max_activations_per_tick", 8)
         ),
         max_batch_size=int(data.get("execution", {}).get("max_batch_size", 4)),
+        max_events_per_tick=int(data.get("scheduler", {}).get("max_events_per_tick", 32)),
+        agent_replicas=int(data.get("scenario", {}).get("agent_replicas", 1))
+        if isinstance(data.get("scenario"), dict)
+        else int(data.get("agent_replicas", 1)),
     )
 
 
@@ -40,6 +46,8 @@ def merge_cli(config: RuntimeConfig, overrides: dict[str, Any]) -> RuntimeConfig
         "sqlite_path": config.sqlite_path,
         "max_activations_per_tick": config.max_activations_per_tick,
         "max_batch_size": config.max_batch_size,
+        "max_events_per_tick": config.max_events_per_tick,
+        "agent_replicas": config.agent_replicas,
     }
     values.update({key: value for key, value in overrides.items() if value is not None})
     return RuntimeConfig(**values)

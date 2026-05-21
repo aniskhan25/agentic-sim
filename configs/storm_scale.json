@@ -1,0 +1,20 @@
+{
+  "scenario": {
+    "name": "storm",
+    "agent_replicas": 64
+  },
+  "steps": 20,
+  "scheduler": {
+    "policy": "fifo",
+    "max_activations_per_tick": 256,
+    "max_events_per_tick": 512
+  },
+  "execution": {
+    "backend": "mock",
+    "max_batch_size": 64
+  },
+  "storage": {
+    "mode": "sqlite",
+    "sqlite_path": "data/storm_scale.sqlite"
+  }
+}

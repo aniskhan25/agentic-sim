@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from time import perf_counter
+
 from multiagent_demo.engine.clock import SimulationClock
 from multiagent_demo.environment.base import Environment
 from multiagent_demo.execution import BatchBuilder, ContextBuilder
@@ -10,7 +12,6 @@ from multiagent_demo.observability import TraceWriter
 from multiagent_demo.scheduling import SchedulerInput
 from multiagent_demo.scheduling.base import Scheduler
 from multiagent_demo.state.base import RuntimeStore
-from multiagent_demo.utils.serialization import to_jsonable
 
 
 class SimulationEngine:
@@ -45,11 +46,17 @@ class SimulationEngine:
         return [self.step() for _ in range(steps)]
 
     def step(self) -> SimulationTickResult:
+        step_start = perf_counter()
+        timings: dict[str, float] = {}
+
+        started = perf_counter()
         ready_events = self.store.events.pop_ready(self.clock.now, limit=self.max_events_per_tick)
         if not ready_events:
             ready_events = self._advance_environment()
+        timings["event_loading_ms"] = _elapsed_ms(started)
 
         event_by_id = {event.event_id: event for event in ready_events}
+        started = perf_counter()
         activations = self.scheduler.plan(
             SchedulerInput(
                 now=self.clock.now,
@@ -57,6 +64,9 @@ class SimulationEngine:
                 agent_profiles=self.store.agents.list_profiles(),
             )
         )
+        timings["scheduling_ms"] = _elapsed_ms(started)
+
+        started = perf_counter()
         requests = [
             self.context_builder.build(
                 activation=activation,
@@ -65,16 +75,23 @@ class SimulationEngine:
             )
             for activation in activations
         ]
+        timings["context_building_ms"] = _elapsed_ms(started)
 
+        started = perf_counter()
+        batches = self.batch_builder.group(requests)
+        timings["batching_ms"] = _elapsed_ms(started)
         results: list[ExecutionResult] = []
-        for batch in self.batch_builder.group(requests):
+        started = perf_counter()
+        for batch in batches:
             results.extend(self.backend.run_batch(batch))
+        timings["backend_execution_ms"] = _elapsed_ms(started)
 
         emitted_messages = 0
         traces_written = 0
         environment_actions = []
         emitted_events: list[Event] = []
 
+        started = perf_counter()
         for result in results:
             self.store.agents.put_state(result.updated_state)
             emitted_messages += len(result.outgoing_messages)
@@ -92,7 +109,9 @@ class SimulationEngine:
                 },
             )
             traces_written += 1
+        timings["result_application_ms"] = _elapsed_ms(started)
 
+        started = perf_counter()
         if environment_actions:
             transition = self.environment.apply_actions(
                 self.store.environment.get(), environment_actions
@@ -100,8 +119,12 @@ class SimulationEngine:
             self.store.environment.put(transition.state)
             self.store.events.put_many(transition.emitted_events)
             emitted_events.extend(transition.emitted_events)
+        timings["environment_actions_ms"] = _elapsed_ms(started)
 
+        started = perf_counter()
         self.store.events.put_many(emitted_events)
+        timings["event_persistence_ms"] = _elapsed_ms(started)
+        timings["total_ms"] = _elapsed_ms(step_start)
         self.tracer.write(
             self.store,
             "simulation_tick",
@@ -109,7 +132,9 @@ class SimulationEngine:
                 "tick": self.store.environment.get().tick,
                 "processed_events": len(ready_events),
                 "activations": len(activations),
+                "batches": len(batches),
                 "messages_emitted": emitted_messages,
+                "timing_ms": timings,
             },
         )
         traces_written += 1
@@ -126,3 +151,7 @@ class SimulationEngine:
         transition = self.environment.tick(self.store.environment.get(), self.clock.now)
         self.store.environment.put(transition.state)
         return transition.emitted_events
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 3)

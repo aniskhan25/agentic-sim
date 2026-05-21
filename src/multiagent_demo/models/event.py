@@ -11,6 +11,7 @@ from multiagent_demo.utils.time import utc_now
 
 class EventType(StrEnum):
     ENVIRONMENT_UPDATE = "environment_update"
+    STORM_OUTAGE = "storm_outage"
     MESSAGE_ARRIVED = "message_arrived"
     TIMER_FIRED = "timer_fired"
     TOOL_RESULT = "tool_result"

@@ -15,9 +15,17 @@ from multiagent_demo.utils.time import utc_now
 class StormEnvironment:
     """Deterministic storm-response environment for local simulation."""
 
-    def __init__(self, regions: list[str] | None = None, severity_step: int = 1):
+    def __init__(
+        self,
+        regions: list[str] | None = None,
+        severity_step: int = 1,
+        coordinator_id: str = "agent_coordinator",
+        operator_ids: list[str] | None = None,
+    ):
         self.regions = regions or ["helsinki", "oulu"]
         self.severity_step = severity_step
+        self.coordinator_id = coordinator_id
+        self.operator_ids = operator_ids or ["agent_hospital", "agent_utility"]
 
     def initialize(self) -> EnvironmentState:
         return EnvironmentState(
@@ -60,6 +68,7 @@ class StormEnvironment:
         variables = dict(state.variables)
         variables["severity"] = severity
         variables["last_summary"] = f"storm severity increased to {severity}"
+        affected_region = self.regions[(state.tick + 1) % len(self.regions)]
         next_state = EnvironmentState(
             scenario=state.scenario,
             tick=state.tick + 1,
@@ -74,10 +83,31 @@ class StormEnvironment:
                 "severity": severity,
                 "regions": list(variables.get("regions", [])),
                 "summary": variables["last_summary"],
-                "coordinator_id": "agent_coordinator",
-                "operator_ids": ["agent_hospital", "agent_utility"],
+                "coordinator_id": self.coordinator_id,
+                "operator_ids": self.operator_ids,
             },
             priority=severity,
             scheduled_for=now,
         )
-        return EnvironmentTransitionResult(state=next_state, emitted_events=[event])
+        emitted = [event]
+        if severity >= 3:
+            emitted.append(
+                Event.create(
+                    EventType.STORM_OUTAGE,
+                    source="environment:storm",
+                    target_scope={"roles": ["coordinator", "utility"]},
+                    payload={
+                        "severity": severity,
+                        "region": affected_region,
+                        "outage_level": "major" if severity >= 5 else "localized",
+                        "coordinator_id": self.coordinator_id,
+                        "operator_ids": [
+                            agent_id for agent_id in self.operator_ids if "utility" in agent_id
+                        ],
+                        "summary": f"grid outage risk in {affected_region}",
+                    },
+                    priority=severity + 1,
+                    scheduled_for=now,
+                )
+            )
+        return EnvironmentTransitionResult(state=next_state, emitted_events=emitted)
