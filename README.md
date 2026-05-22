@@ -127,7 +127,7 @@ To add a new scenario:
 1. Implement an environment with `initialize()`, `tick()`, and `apply_actions()`.
 2. Define the agent profiles for that scenario.
 3. Add a `create_<scenario>_engine()` factory.
-4. Register it in `SCENARIOS` in `src/agentic_sim/engine/runtime.py`.
+4. Register it in `SCENARIOS` in `src/agentic_sim/scenarios/registry.py`.
 5. Add a config file under `configs/`.
 
 ## Understanding Output
@@ -182,6 +182,7 @@ The runtime is organized around explicit boundaries:
 - `execution`: context building, simple batching, and deterministic backends.
 - `messaging`: structured message delivery and follow-up event creation.
 - `environment`: deterministic scenario rules.
+- `scenarios`: scenario profiles, engine factories, and registry wiring.
 - `engine`: the top-level simulation loop.
 - `observability`: trace writing and run summaries.
 
