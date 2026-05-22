@@ -21,7 +21,6 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--backend", choices=["mock", "rule"], help="Execution backend")
     run.add_argument("--storage-mode", choices=["memory", "sqlite"], help="State storage mode")
     run.add_argument("--sqlite-path", help="SQLite database path")
-    run.add_argument("--max-activations-per-tick", type=int)
     run.add_argument("--max-batch-size", type=int)
     run.add_argument("--max-events-per-tick", type=int)
     run.add_argument("--agent-replicas", type=int)
@@ -44,7 +43,6 @@ def run_command(args: argparse.Namespace) -> int:
             "backend": args.backend,
             "storage_mode": args.storage_mode,
             "sqlite_path": args.sqlite_path,
-            "max_activations_per_tick": args.max_activations_per_tick,
             "max_batch_size": args.max_batch_size,
             "max_events_per_tick": args.max_events_per_tick,
             "agent_replicas": args.agent_replicas,
@@ -54,7 +52,6 @@ def run_command(args: argparse.Namespace) -> int:
         storage_mode=config.storage_mode,
         sqlite_path=config.sqlite_path,
         backend_name=config.backend,
-        max_activations_per_tick=config.max_activations_per_tick,
         max_batch_size=config.max_batch_size,
         max_events_per_tick=config.max_events_per_tick,
         agent_replicas=config.agent_replicas,

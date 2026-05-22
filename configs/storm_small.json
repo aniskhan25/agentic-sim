@@ -2,8 +2,7 @@
   "scenario": "storm",
   "steps": 4,
   "scheduler": {
-    "policy": "fifo",
-    "max_activations_per_tick": 8
+    "policy": "fifo"
   },
   "execution": {
     "backend": "mock",

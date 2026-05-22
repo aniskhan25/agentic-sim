@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -49,3 +50,34 @@ class StateStoreTests(unittest.TestCase):
             self.assertEqual(reopened.environment.get().scenario, "storm")
             self.assertEqual(reopened.events.pop_ready(utc_now())[0].event_type, EventType.STORM_OUTAGE)
             reopened.close()
+
+    def test_sqlite_store_orders_equal_priority_events_by_creation_time(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "state.sqlite"
+            store = SQLiteStateStore(path, environment=StormEnvironment().initialize())
+            scheduled_for = datetime(2026, 1, 1, tzinfo=timezone.utc)
+            newer = Event(
+                event_id="evt_newer",
+                event_type=EventType.TIMER_FIRED,
+                created_at=scheduled_for + timedelta(seconds=1),
+                scheduled_for=scheduled_for,
+                source="test",
+                priority=1,
+            )
+            older = Event(
+                event_id="evt_older",
+                event_type=EventType.TIMER_FIRED,
+                created_at=scheduled_for,
+                scheduled_for=scheduled_for,
+                source="test",
+                priority=1,
+            )
+
+            store.events.put(newer)
+            store.events.put(older)
+
+            self.assertEqual(
+                [event.event_id for event in store.events.pop_ready(utc_now())],
+                ["evt_older", "evt_newer"],
+            )
+            store.close()

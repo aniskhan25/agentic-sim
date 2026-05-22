@@ -13,8 +13,9 @@ def create_storm_store(
     storage_mode: str = "memory",
     sqlite_path: str = "data/storm.sqlite",
     agent_replicas: int = 1,
+    profiles: list[AgentProfile] | None = None,
 ) -> RuntimeStore:
-    profiles = _storm_profiles(agent_replicas)
+    profiles = profiles or _storm_profiles(agent_replicas)
     operator_ids = [
         str(profile.agent_id) for profile in profiles if profile.role in {"hospital", "utility"}
     ]
@@ -84,7 +85,6 @@ def create_storm_engine(
     storage_mode: str = "memory",
     sqlite_path: str = "data/storm.sqlite",
     backend_name: str = "mock",
-    max_activations_per_tick: int = 8,
     max_batch_size: int = 4,
     max_events_per_tick: int = 32,
     agent_replicas: int = 1,
@@ -98,11 +98,12 @@ def create_storm_engine(
         storage_mode=storage_mode,
         sqlite_path=sqlite_path,
         agent_replicas=agent_replicas,
+        profiles=profiles,
     )
     backend = RuleExecutionBackend() if backend_name == "rule" else MockExecutionBackend()
     return SimulationEngine(
         store=store,
-        scheduler=FIFOScheduler(max_activations_per_tick=max_activations_per_tick),
+        scheduler=FIFOScheduler(),
         backend=backend,
         environment=environment,
         batch_builder=BatchBuilder(max_batch_size=max_batch_size),

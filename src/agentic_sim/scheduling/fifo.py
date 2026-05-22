@@ -7,9 +7,6 @@ from agentic_sim.scheduling.base import SchedulerInput
 class FIFOScheduler:
     """Priority-aware FIFO scheduler with one activation per agent per tick."""
 
-    def __init__(self, max_activations_per_tick: int = 16):
-        self.max_activations_per_tick = max_activations_per_tick
-
     def plan(self, snapshot: SchedulerInput) -> list[Activation]:
         profiles = {profile.agent_id: profile for profile in snapshot.agent_profiles}
         activations: list[Activation] = []
@@ -31,8 +28,6 @@ class FIFOScheduler:
                     )
                 )
                 activated_agents.add(agent_key)
-                if len(activations) >= self.max_activations_per_tick:
-                    return activations
         return activations
 
     def _targets(self, event: Event, profiles: list[AgentProfile]) -> list[AgentProfile]:

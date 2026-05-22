@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -57,6 +56,7 @@ class SQLiteStateStore:
             create table if not exists events (
                 event_id text primary key,
                 scheduled_for text not null,
+                created_at text,
                 priority integer not null,
                 payload text not null
             );
@@ -79,7 +79,25 @@ class SQLiteStateStore:
             );
             """
         )
+        self._ensure_event_created_at()
         self.conn.commit()
+
+    def _ensure_event_created_at(self) -> None:
+        columns = {
+            row["name"] for row in self.conn.execute("pragma table_info(events)").fetchall()
+        }
+        if "created_at" not in columns:
+            self.conn.execute("alter table events add column created_at text")
+        rows = self.conn.execute(
+            "select event_id, payload from events where created_at is null"
+        ).fetchall()
+        self.conn.executemany(
+            "update events set created_at = ? where event_id = ?",
+            [
+                (to_iso(_event_from_dict(json.loads(row["payload"])).created_at), row["event_id"])
+                for row in rows
+            ],
+        )
 
     def get_profile(self, agent_id: AgentId) -> AgentProfile:
         row = self.conn.execute(
@@ -119,12 +137,13 @@ class SQLiteStateStore:
         if isinstance(item, Event):
             self.conn.execute(
                 """
-                insert or replace into events(event_id, scheduled_for, priority, payload)
-                values (?, ?, ?, ?)
+                insert or replace into events(event_id, scheduled_for, created_at, priority, payload)
+                values (?, ?, ?, ?, ?)
                 """,
                 (
                     item.event_id,
                     to_iso(item.scheduled_for),
+                    to_iso(item.created_at),
                     item.priority,
                     json.dumps(to_jsonable(item)),
                 ),
@@ -170,7 +189,7 @@ class SQLiteStateStore:
         query = """
             select event_id, payload from events
             where scheduled_for <= ?
-            order by priority desc, scheduled_for asc
+            order by priority desc, scheduled_for asc, created_at asc
         """
         params: tuple[Any, ...] = (to_iso(now),)
         if limit is not None:

@@ -6,7 +6,6 @@
   "steps": 20,
   "scheduler": {
     "policy": "fifo",
-    "max_activations_per_tick": 256,
     "max_events_per_tick": 512
   },
   "execution": {

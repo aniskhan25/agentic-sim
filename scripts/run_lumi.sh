@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=00:15:00
-#SBATCH --output=logs/%x-%j.out
+#SBATCH --output=/scratch/project_462000131/anisrahm/agentic-sim-%j.out
 
 set -euo pipefail
 
