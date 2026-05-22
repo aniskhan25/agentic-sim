@@ -1,6 +1,11 @@
 import unittest
 
-from agentic_sim.engine import create_storm_engine
+from agentic_sim.engine import (
+    SCENARIOS,
+    create_engine,
+    create_storm_engine,
+    create_supply_chain_engine,
+)
 
 
 class EngineTests(unittest.TestCase):
@@ -28,3 +33,33 @@ class EngineTests(unittest.TestCase):
         self.assertIn("backend_execution_ms", timing)
         self.assertIn("total_ms", timing)
         self.assertEqual(tick_traces[-1].payload["batches"], 4)
+
+    def test_engine_factory_selects_registered_scenario(self):
+        engine = create_engine(scenario="storm")
+
+        self.assertEqual(engine.store.environment.get().scenario, "storm")
+        self.assertIn("storm", SCENARIOS)
+
+    def test_engine_factory_selects_supply_chain_scenario(self):
+        engine = create_engine(
+            scenario="supply_chain",
+            scenario_parameters={"demand_step": 15, "regions": ["helsinki", "oulu", "tampere"]},
+        )
+
+        environment = engine.store.environment.get()
+        self.assertEqual(environment.scenario, "supply_chain")
+        self.assertEqual(environment.variables["regions"], ["helsinki", "oulu", "tampere"])
+        self.assertIn("supply_chain", SCENARIOS)
+
+    def test_supply_chain_engine_runs_and_records_messages(self):
+        engine = create_supply_chain_engine()
+
+        engine.run(4)
+
+        self.assertEqual(engine.store.environment.get().scenario, "supply_chain")
+        self.assertGreaterEqual(len(engine.store.messages.list()), 2)
+        self.assertGreaterEqual(engine.store.environment.get().variables["demand"], 110)
+
+    def test_engine_factory_rejects_unknown_scenario(self):
+        with self.assertRaisesRegex(ValueError, "unsupported scenario"):
+            create_engine(scenario="unknown")

@@ -37,6 +37,7 @@ class SQLiteStateStore:
         self.traces = self
         self._migrate()
         if environment is not None:
+            self._clear_run()
             self.put(environment)
 
     def close(self) -> None:
@@ -98,6 +99,19 @@ class SQLiteStateStore:
                 for row in rows
             ],
         )
+
+    def _clear_run(self) -> None:
+        self.conn.executescript(
+            """
+            delete from agent_profiles;
+            delete from agent_states;
+            delete from events;
+            delete from messages;
+            delete from environment;
+            delete from traces;
+            """
+        )
+        self.conn.commit()
 
     def get_profile(self, agent_id: AgentId) -> AgentProfile:
         row = self.conn.execute(

@@ -14,7 +14,9 @@ class CliTests(unittest.TestCase):
             output = Path(tmpdir) / "run.json"
 
             with redirect_stdout(StringIO()):
-                exit_code = main(["run", "--steps", "2", "--output", str(output)])
+                exit_code = main(
+                    ["run", "--scenario", "storm", "--steps", "2", "--output", str(output)]
+                )
 
             self.assertEqual(exit_code, 0)
             artifact = json.loads(output.read_text())
@@ -23,3 +25,12 @@ class CliTests(unittest.TestCase):
             self.assertIn("environment", artifact)
             self.assertIn("traces", artifact)
             self.assertGreaterEqual(len(artifact["traces"]), 1)
+
+    def test_run_command_loads_supply_chain_config(self):
+        with redirect_stdout(StringIO()) as stdout:
+            exit_code = main(["run", "--config", "configs/supply_chain_small.json"])
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertGreaterEqual(payload["summary"]["environment_tick"], 1)
+        self.assertGreaterEqual(payload["summary"]["messages"], 1)

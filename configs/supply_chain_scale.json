@@ -1,0 +1,24 @@
+{
+  "scenario": {
+    "name": "supply_chain",
+    "agent_replicas": 64,
+    "parameters": {
+      "regions": ["helsinki", "oulu", "tampere", "turku"],
+      "demand_step": 15,
+      "delay_step": 5
+    }
+  },
+  "steps": 20,
+  "scheduler": {
+    "policy": "fifo",
+    "max_events_per_tick": 512
+  },
+  "execution": {
+    "backend": "mock",
+    "max_batch_size": 64
+  },
+  "storage": {
+    "mode": "sqlite",
+    "sqlite_path": "data/supply_chain_scale.sqlite"
+  }
+}

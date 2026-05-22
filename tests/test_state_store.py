@@ -81,3 +81,18 @@ class StateStoreTests(unittest.TestCase):
                 ["evt_older", "evt_newer"],
             )
             store.close()
+
+    def test_sqlite_store_initialization_starts_fresh_run(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "state.sqlite"
+            environment = StormEnvironment().initialize()
+            store = SQLiteStateStore(path, environment=environment)
+            store.events.put(Event.create(EventType.TIMER_FIRED, source="test"))
+            store.close()
+
+            fresh = SQLiteStateStore(path, environment=environment)
+
+            self.assertEqual(fresh.events.count_pending(), 0)
+            self.assertEqual(fresh.messages.count(), 0)
+            self.assertEqual(len(fresh.traces.list()), 0)
+            fresh.close()

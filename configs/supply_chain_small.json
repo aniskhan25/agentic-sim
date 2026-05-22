@@ -1,0 +1,21 @@
+{
+  "scenario": {
+    "name": "supply_chain",
+    "parameters": {
+      "regions": ["helsinki", "oulu"],
+      "demand_step": 10,
+      "delay_step": 4
+    }
+  },
+  "steps": 4,
+  "scheduler": {
+    "policy": "fifo"
+  },
+  "execution": {
+    "backend": "mock",
+    "max_batch_size": 4
+  },
+  "storage": {
+    "mode": "memory"
+  }
+}

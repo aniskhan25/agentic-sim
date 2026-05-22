@@ -2,16 +2,18 @@
 
 A minimal event-driven runtime for multi-agent simulation experiments.
 
-The current scenario is a deterministic storm-response simulation. It creates coordinator, hospital, utility, and forecaster agents, routes events and messages between them, records state, and writes traces. No LLM, vector database, distributed runtime, or external service is required.
+The repo includes deterministic storm-response and supply-chain simulations. They create agents, route events and messages between them, record state, and write traces. No LLM, vector database, distributed runtime, or external service is required.
 
 The code is intentionally small so the simulation loop can be inspected and tested locally before real model-serving backends are added.
 
 ## What Runs Today
 
 - A storm environment that increases severity over time.
+- A supply-chain environment with demand, inventory, and shipment-delay pressure.
 - A coordinator agent that asks operators for status.
 - Hospital and utility agents that report local status.
 - Forecaster agents that update the environment summary.
+- Supplier, warehouse, transport, and retailer agents for logistics runs.
 - In-memory storage for local runs.
 - SQLite storage for persisted runs.
 - Deterministic mock/rule execution backends.
@@ -57,6 +59,13 @@ PYTHONPATH=src python3 -m agentic_sim.cli run \
   --config configs/storm_scale.json
 ```
 
+Run the supply-chain example:
+
+```bash
+PYTHONPATH=src python3 -m agentic_sim.cli run \
+  --config configs/supply_chain_small.json
+```
+
 Persist a full run artifact with traces and the final environment snapshot:
 
 ```bash
@@ -80,10 +89,46 @@ Useful CLI overrides:
 ```bash
 PYTHONPATH=src python3 -m agentic_sim.cli run \
   --config configs/storm_scale.json \
+  --scenario storm \
   --steps 50 \
   --agent-replicas 128 \
   --max-batch-size 64
 ```
+
+## Adding Scenarios
+
+Scenarios are selected by name through the runtime registry. The current registered scenarios are `storm` and `supply_chain`.
+
+Config files can select a scenario with either form:
+
+```json
+{
+  "scenario": "storm"
+}
+```
+
+or:
+
+```json
+{
+  "scenario": {
+    "name": "storm",
+    "agent_replicas": 64,
+    "parameters": {
+      "severity_step": 2,
+      "regions": ["helsinki", "oulu", "tampere"]
+    }
+  }
+}
+```
+
+To add a new scenario:
+
+1. Implement an environment with `initialize()`, `tick()`, and `apply_actions()`.
+2. Define the agent profiles for that scenario.
+3. Add a `create_<scenario>_engine()` factory.
+4. Register it in `SCENARIOS` in `src/agentic_sim/engine/runtime.py`.
+5. Add a config file under `configs/`.
 
 ## Understanding Output
 
@@ -94,7 +139,7 @@ A run prints a compact JSON summary:
 - `activations`: agents selected to respond.
 - `messages_emitted`: messages produced by agents.
 - `traces_written`: trace records written for that engine step.
-- `summary.environment_tick`: storm environment tick.
+- `summary.environment_tick`: scenario environment tick.
 - `summary.pending_events`: events still queued after the run.
 - `summary.messages`: total persisted messages.
 - `summary.traces`: total persisted traces.
@@ -136,7 +181,7 @@ The runtime is organized around explicit boundaries:
 - `scheduling`: FIFO activation planning from ready events.
 - `execution`: context building, simple batching, and deterministic backends.
 - `messaging`: structured message delivery and follow-up event creation.
-- `environment`: deterministic storm scenario rules.
+- `environment`: deterministic scenario rules.
 - `engine`: the top-level simulation loop.
 - `observability`: trace writing and run summaries.
 
@@ -146,6 +191,7 @@ Additional docs:
 - [docs/execution_model.md](docs/execution_model.md): activation and execution flow.
 - [docs/storage.md](docs/storage.md): storage boundary.
 - [docs/scenario_storm.md](docs/scenario_storm.md): storm scenario details.
+- [docs/scenario_supply_chain.md](docs/scenario_supply_chain.md): supply-chain scenario details.
 - [docs/lumi.md](docs/lumi.md): LUMI batch runs.
 - [docs/amd_vllm_lumi_tuning.md](docs/amd_vllm_lumi_tuning.md): future AMD/vLLM throughput knobs.
 

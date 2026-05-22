@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from agentic_sim.config import load_config, merge_cli
-from agentic_sim.engine import create_storm_engine
+from agentic_sim.engine import create_engine
 from agentic_sim.observability import RunSummaryBuilder
 from agentic_sim.utils.serialization import to_jsonable
 
@@ -15,8 +15,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agentic-sim")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
-    run = subcommands.add_parser("run", help="Run the storm-response simulation")
+    run = subcommands.add_parser("run", help="Run a simulation scenario")
     run.add_argument("--config", help="Path to a JSON runtime config")
+    run.add_argument("--scenario", help="Scenario name")
     run.add_argument("--steps", type=int, help="Number of simulation steps")
     run.add_argument("--backend", choices=["mock", "rule"], help="Execution backend")
     run.add_argument("--storage-mode", choices=["memory", "sqlite"], help="State storage mode")
@@ -39,6 +40,7 @@ def run_command(args: argparse.Namespace) -> int:
     config = merge_cli(
         load_config(args.config),
         {
+            "scenario": args.scenario,
             "steps": args.steps,
             "backend": args.backend,
             "storage_mode": args.storage_mode,
@@ -48,9 +50,11 @@ def run_command(args: argparse.Namespace) -> int:
             "agent_replicas": args.agent_replicas,
         },
     )
-    engine = create_storm_engine(
+    engine = create_engine(
+        scenario=config.scenario,
+        scenario_parameters=config.scenario_parameters,
         storage_mode=config.storage_mode,
-        sqlite_path=config.sqlite_path,
+        sqlite_path=config.sqlite_path or f"data/{config.scenario}.sqlite",
         backend_name=config.backend,
         max_batch_size=config.max_batch_size,
         max_events_per_tick=config.max_events_per_tick,

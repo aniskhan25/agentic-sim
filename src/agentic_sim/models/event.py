@@ -12,6 +12,9 @@ from agentic_sim.utils.time import utc_now
 class EventType(StrEnum):
     ENVIRONMENT_UPDATE = "environment_update"
     STORM_OUTAGE = "storm_outage"
+    SUPPLY_CHAIN_UPDATE = "supply_chain_update"
+    SHIPMENT_DELAY = "shipment_delay"
+    INVENTORY_SHORTAGE = "inventory_shortage"
     MESSAGE_ARRIVED = "message_arrived"
     TIMER_FIRED = "timer_fired"
     TOOL_RESULT = "tool_result"
