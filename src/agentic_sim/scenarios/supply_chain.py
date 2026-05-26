@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from agentic_sim.engine.simulation_engine import SimulationEngine
 from agentic_sim.environment import SupplyChainEnvironment
 from agentic_sim.execution import BatchBuilder, SupplyChainRuleBackend
 from agentic_sim.models import AgentId, AgentProfile
 from agentic_sim.scenarios.common import create_store, string_list
 from agentic_sim.scheduling import FIFOScheduler
 from agentic_sim.state.base import RuntimeStore
+
+if TYPE_CHECKING:
+    from agentic_sim.engine.simulation_engine import SimulationEngine
 
 
 def create_supply_chain_store(
@@ -42,16 +44,17 @@ def create_supply_chain_engine(
     scenario_parameters = scenario_parameters or {}
     profiles = _supply_chain_profiles(agent_replicas)
     environment = _supply_chain_environment(profiles, scenario_parameters)
-    store = create_supply_chain_store(
+    store = create_store(
         storage_mode=storage_mode,
         sqlite_path=sqlite_path,
-        agent_replicas=agent_replicas,
+        environment=environment.initialize(),
         profiles=profiles,
-        scenario_parameters=scenario_parameters,
     )
     if backend_name not in {"mock", "rule"}:
         raise ValueError(f"unsupported backend {backend_name!r}")
     backend = SupplyChainRuleBackend(name=backend_name)
+    from agentic_sim.engine.simulation_engine import SimulationEngine
+
     return SimulationEngine(
         store=store,
         scheduler=FIFOScheduler(),
