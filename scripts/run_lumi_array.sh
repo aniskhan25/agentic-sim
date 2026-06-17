@@ -20,6 +20,7 @@ if [[ -d ".venv" ]]; then
 fi
 
 PYTHON="${PYTHON:-python3}"
+PROJECT_PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
 JOB_ID="${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-local}}"
 CONFIG_LIST="${CONFIG_LIST:-configs/storm_small.json configs/supply_chain_small.json configs/storm_scale.json configs/supply_chain_scale.json}"
@@ -54,7 +55,7 @@ AITTA_WARMUP_INTERVAL="${AITTA_WARMUP_INTERVAL:-30}"
 mkdir -p "${RUN_DIR}" "${RUN_ROOT}"
 
 if [[ "${AITTA_WARMUP}" == "1" ]]; then
-  PYTHONPATH="${PYTHONPATH:-src}" "${PYTHON}" -m agentic_sim.cli check-aitta \
+  PYTHONPATH="${PROJECT_PYTHONPATH}" "${PYTHON}" -m agentic_sim.cli check-aitta \
     --wait \
     --wait-timeout "${AITTA_WARMUP_TIMEOUT}" \
     --wait-interval "${AITTA_WARMUP_INTERVAL}"
@@ -81,7 +82,7 @@ if [[ -n "${MAX_BATCH_SIZE}" ]]; then
   args+=(--max-batch-size "${MAX_BATCH_SIZE}")
 fi
 
-PYTHONPATH="${PYTHONPATH:-src}" "${PYTHON}" -m agentic_sim.cli "${args[@]}"
-PYTHONPATH="${PYTHONPATH:-src}" "${PYTHON}" -m agentic_sim.cli aggregate-runs \
+PYTHONPATH="${PROJECT_PYTHONPATH}" "${PYTHON}" -m agentic_sim.cli "${args[@]}"
+PYTHONPATH="${PROJECT_PYTHONPATH}" "${PYTHON}" -m agentic_sim.cli aggregate-runs \
   "${RUN_ROOT}" \
   --output "${RUN_ROOT}/aggregate.json"

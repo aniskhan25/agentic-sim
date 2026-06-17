@@ -19,6 +19,7 @@ if [[ -d ".venv" ]]; then
 fi
 
 PYTHON="${PYTHON:-python3}"
+PROJECT_PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 JOB_ID="${SLURM_JOB_ID:-local}"
 CONFIG="${CONFIG:-configs/storm_scale.json}"
 if [[ -z "${ARTIFACT_ROOT:-}" ]]; then
@@ -43,7 +44,7 @@ AITTA_WARMUP_INTERVAL="${AITTA_WARMUP_INTERVAL:-30}"
 mkdir -p "${RUN_DIR}"
 
 if [[ "${AITTA_WARMUP}" == "1" ]]; then
-  PYTHONPATH="${PYTHONPATH:-src}" "${PYTHON}" -m agentic_sim.cli check-aitta \
+  PYTHONPATH="${PROJECT_PYTHONPATH}" "${PYTHON}" -m agentic_sim.cli check-aitta \
     --wait \
     --wait-timeout "${AITTA_WARMUP_TIMEOUT}" \
     --wait-interval "${AITTA_WARMUP_INTERVAL}"
@@ -66,4 +67,4 @@ if [[ -n "${MAX_BATCH_SIZE}" ]]; then
   args+=(--max-batch-size "${MAX_BATCH_SIZE}")
 fi
 
-PYTHONPATH="${PYTHONPATH:-src}" "${PYTHON}" -m agentic_sim.cli "${args[@]}"
+PYTHONPATH="${PROJECT_PYTHONPATH}" "${PYTHON}" -m agentic_sim.cli "${args[@]}"
