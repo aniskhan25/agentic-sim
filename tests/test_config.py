@@ -1,4 +1,5 @@
 import unittest
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 from agentic_sim.config import load_config
@@ -29,3 +30,27 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(
             config.scenario_parameters["regions"], ["helsinki", "oulu", "tampere", "turku"]
         )
+
+    def test_aitta_execution_options_load_from_config(self):
+        with TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "aitta.json"
+            config_path.write_text(
+                """
+                {
+                  "execution": {
+                    "backend": "aitta",
+                    "aitta_base_url": "https://aitta.example/openai/v1/",
+                    "aitta_model": "demo/model",
+                    "aitta_timeout": 45,
+                    "aitta_max_concurrency": 1
+                  }
+                }
+                """
+            )
+
+            config = load_config(str(config_path))
+
+        self.assertEqual(config.backend, "aitta")
+        self.assertEqual(config.backend_options["aitta_base_url"], "https://aitta.example/openai/v1/")
+        self.assertEqual(config.backend_options["aitta_model"], "demo/model")
+        self.assertEqual(config.backend_options["aitta_timeout"], 45)

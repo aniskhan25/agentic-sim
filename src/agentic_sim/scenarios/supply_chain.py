@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from agentic_sim.environment import SupplyChainEnvironment
-from agentic_sim.execution import BatchBuilder, SupplyChainRuleBackend
+from agentic_sim.execution import BatchBuilder, create_execution_backend
 from agentic_sim.models import AgentId, AgentProfile
 from agentic_sim.scenarios.common import create_store, string_list
 from agentic_sim.scheduling import FIFOScheduler
@@ -40,6 +40,7 @@ def create_supply_chain_engine(
     max_events_per_tick: int = 32,
     agent_replicas: int = 1,
     scenario_parameters: dict[str, Any] | None = None,
+    backend_options: dict[str, Any] | None = None,
 ) -> SimulationEngine:
     scenario_parameters = scenario_parameters or {}
     profiles = _supply_chain_profiles(agent_replicas)
@@ -50,9 +51,11 @@ def create_supply_chain_engine(
         environment=environment.initialize(),
         profiles=profiles,
     )
-    if backend_name not in {"mock", "rule"}:
-        raise ValueError(f"unsupported backend {backend_name!r}")
-    backend = SupplyChainRuleBackend(name=backend_name)
+    backend = create_execution_backend(
+        backend_name,
+        scenario="supply_chain",
+        backend_options=backend_options,
+    )
     from agentic_sim.engine.simulation_engine import SimulationEngine
 
     return SimulationEngine(
