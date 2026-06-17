@@ -19,6 +19,10 @@ if [[ -d ".venv" ]]; then
   source ".venv/bin/activate"
 fi
 
+if [[ "${LOAD_CRAY_PYTHON:-1}" == "1" ]] && command -v module >/dev/null 2>&1; then
+  module load cray-python
+fi
+
 PYTHON="${PYTHON:-python3}"
 PROJECT_PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
