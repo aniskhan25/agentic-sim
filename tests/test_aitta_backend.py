@@ -188,6 +188,54 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(result.metadata["retry_count"], 2)
 
 
+    def test_request_prompt_includes_environment_specific_response_shape(self):
+        """response_shape sent to the model reflects actual environment values."""
+        captured = []
+
+        def transport(url, headers, payload, timeout):
+            captured.append(payload)
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+        backend.run_batch([_request()])
+
+        user_content = json.loads(captured[0]["messages"][1]["content"])
+        shape = user_content["response_shape"]
+        # Shape should reference actual environment severity (4), not a generic placeholder
+        shape_str = json.dumps(shape)
+        self.assertIn("4", shape_str)
+        # Shape should name the coordinator's agent_id as a recipient
+        self.assertIn("agent_hospital", shape_str)
+
+    def test_role_policy_requirements_include_payload_guidance(self):
+        """Requirements in role_policy carry payload_guidance to steer model output content."""
+        captured = []
+
+        def transport(url, headers, payload, timeout):
+            captured.append(payload)
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+        backend.run_batch([_request()])
+
+        user_content = json.loads(captured[0]["messages"][1]["content"])
+        requirements = user_content["role_policy"]["requirements"]
+        self.assertTrue(
+            any("payload_guidance" in req for req in requirements),
+            "At least one requirement should carry payload_guidance",
+        )
+
+
 def _request() -> ExecutionRequest:
     now = utc_now()
     event = Event.create(
