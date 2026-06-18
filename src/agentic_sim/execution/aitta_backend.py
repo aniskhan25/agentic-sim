@@ -77,7 +77,7 @@ class AittaExecutionBackend:
     def _run_one(self, request: ExecutionRequest) -> ExecutionResult:
         payload = self._request_payload(request)
         started = time.perf_counter()
-        response = self._send(payload)
+        response, retry_count = self._send(payload)
         latency_seconds = time.perf_counter() - started
         content = _first_choice_text(response)
         try:
@@ -89,18 +89,18 @@ class AittaExecutionBackend:
                     "model_output_error": str(exc),
                 }
             }
-        return self._result_from_proposal(request, proposal, response, latency_seconds)
+        return self._result_from_proposal(request, proposal, response, latency_seconds, retry_count)
 
-    def _send(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def _send(self, payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         url = self.base_url.rstrip("/") + "/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
         last_error: Exception | None = None
-        for _ in range(self.max_retries + 1):
+        for attempt in range(self.max_retries + 1):
             try:
-                return self.transport(url, headers, payload, self.timeout_seconds)
+                return self.transport(url, headers, payload, self.timeout_seconds), attempt
             except Exception as exc:  # pragma: no cover - exercised by caller behavior
                 last_error = exc
         raise RuntimeError(
@@ -127,6 +127,7 @@ class AittaExecutionBackend:
         proposal: dict[str, Any],
         response: dict[str, Any],
         latency_seconds: float,
+        retry_count: int = 0,
     ) -> ExecutionResult:
         state = _updated_state(request, proposal)
         metadata = {
@@ -134,6 +135,7 @@ class AittaExecutionBackend:
             "model": self.model_name,
             "role": request.agent_profile.role,
             "latency_seconds": round(latency_seconds, 3),
+            "retry_count": retry_count,
             "usage": response.get("usage"),
         }
         metadata.update(_dict_value(proposal, "metadata"))
@@ -184,7 +186,7 @@ def check_aitta_connection(
         "n": 1,
     }
     started = time.perf_counter()
-    response = backend._send(payload)
+    response, _ = backend._send(payload)
     latency_seconds = round(time.perf_counter() - started, 3)
     content = _first_choice_text(response)
     parsed = _json_object(content)
