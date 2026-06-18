@@ -29,7 +29,7 @@ Implementation:
 - Done: convert each `ExecutionRequest` into a compact prompt or chat payload.
 - Done: require structured JSON output that maps back to `ExecutionResult`.
 - Done: validate model output before applying state changes, messages, events, or environment actions.
-- Next: record model latency, retry count, model name, and validation failures in traces at the simulation-tick level.
+- Done: record model latency, retry count, model name, and validation failures in traces at the simulation-tick level. The `agent_step` trace carries `latency_seconds`, `retry_count`, and `model`; the `simulation_tick` trace carries an aggregated `backend` summary (total latency, retry count, validation failures, agent steps).
 
 Open information needed:
 
@@ -49,7 +49,7 @@ Implementation:
 - Done: define allowed message types and environment actions per role.
 - Done: keep deterministic validators and policy guards for model-proposed or missing actions.
 - Done: add tests with fixed model responses to prove parsing, validation, and passive-model fallback behavior.
-- Next: tune role prompts for higher-quality model-proposed content instead of relying on the guard for minimal required outputs.
+- Done: tune role prompts for higher-quality model-proposed content. Three changes: (1) system prompt no longer suppresses payload content; (2) `response_shape` is now built dynamically per role and scenario, showing a concrete example with actual environment values (severity, regions, risk level, demand); (3) each role requirement carries `payload_guidance` specifying which context fields to include.
 
 ### 3. Run metadata and operational artifacts
 
@@ -84,11 +84,18 @@ Implementation:
 
 Goal: provide a read-only view of run artifacts.
 
+Status: implemented as a Streamlit app at `scripts/dashboard.py`. Install deps with `pip install "agentic-sim[dashboard]"`, launch with `streamlit run scripts/dashboard.py -- --root-dir /path/to/output`. Supports both split artifact directories (`--output-dir`) and monolithic `run.json` files (`--output`).
+
 Implementation:
 
-- Build an artifact-based dashboard that does not participate in the simulation loop.
-- Initial views: run list, summary, environment timeline, events per tick, agent activation counts, message graph, traces table, and backend latency/errors.
-- Prefer a simple prototype stack first, such as Streamlit, unless the dashboard needs to become a deployed service.
+- Done: build an artifact-based dashboard that does not participate in the simulation loop.
+- Done: Summary tab — agent activation bar chart and messages-sent-per-agent.
+- Done: Tick timeline tab — events/activations/messages line chart; per-tick backend latency and summary table.
+- Done: Backend tab — latency min/avg/max, token usage, invalid outputs, policy-guard additions, per-step latency table for Aitta runs.
+- Done: Traces tab — filterable dataframe by event type with raw JSON expander.
+- Done: Config & environment tab — final environment state, run config, run metadata.
+- Done: All runs tab — multi-run comparison table with avg latency and error counts.
+- Next: add message graph (requires sender→recipient pairs in traces; currently traces record message count only).
 
 ### 6. Real-data fixtures
 
@@ -135,4 +142,8 @@ Initial tooling should stay artifact-based. Avoid workflow engines, distributed 
 
 ## Current Recommendation
 
-Start with the Aitta backend, prompt schemas, and artifact metadata. These unlock the model-serving workflow while preserving the current simulation engine design.
+Tasks 1–5 are complete. The remaining near-term work is:
+
+- **Task 4** (one item): add seed/parameter matrix generation for SLURM sweeps if config files alone are not flexible enough.
+- **Task 6**: real-data fixtures (CSV/JSON replay) to improve scenario realism before adding live API clients.
+- **Task 5 follow-on**: message graph view in the dashboard once sender→recipient pairs are recorded in traces.
