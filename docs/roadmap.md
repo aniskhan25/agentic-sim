@@ -101,12 +101,18 @@ Implementation:
 
 Goal: improve scenario realism without adding live API complexity too early.
 
+Status: implemented as replayable JSON fixtures with per-tick replay sequences for both scenarios.
+
 Implementation:
 
-- Start with replayable CSV or JSON fixtures.
-- Storm candidates: weather observations, forecasts, warnings, grid disturbance signals, synthetic hospital capacity.
-- Supply-chain candidates: inventory snapshots, lead times, demand time series, transport delays, port or shipment schedules.
-- Add ingestion as scenario input fixtures before adding live API clients.
+- Done: add `FixtureLoader` (`scenarios/fixtures.py`) that reads and validates fixture JSON, exposing `initial` state overrides and a `ticks` replay list. `FixtureLoader.load_if_configured()` activates when `scenario_parameters["fixture"]` is set.
+- Done: add `initial_variables` and `tick_data` optional params to `StormEnvironment` and `SupplyChainEnvironment`. `initialize()` merges initial overrides; `tick()` reads fixture entry at `state.tick`, falls back to computed progression when exhausted. All changes are backward-compatible.
+- Done: update scenario factories to load the fixture and pass initial/tick data to the environment.
+- Done: storm fixture `data/fixtures/storm_helsinki_oulu.json` — 6-tick Gulf of Finland winter storm (severity 2→3→4→5→4→3), per-tick affected region and weather observation.
+- Done: supply-chain fixture `data/fixtures/supply_chain_nordic.json` — 6-tick Nordic port-congestion and demand-surge with absolute demand, delayed_shipments, and inventory snapshots (shortage peak and recovery arc).
+- Done: `configs/storm_fixture.json` and `configs/supply_chain_fixture.json` for ready-to-use runs.
+- Next: add more fixture variants (different severities, multi-region storms, longer supply-chain disruptions) as scenario coverage needs grow.
+- Next: add live API client ingestion once fixture schemas are stable.
 
 ## Future Tasks
 
@@ -142,8 +148,8 @@ Initial tooling should stay artifact-based. Avoid workflow engines, distributed 
 
 ## Current Recommendation
 
-Tasks 1–5 are complete. The remaining near-term work is:
+Tasks 1–6 are complete. The remaining near-term work is:
 
 - **Task 4** (one item): add seed/parameter matrix generation for SLURM sweeps if config files alone are not flexible enough.
-- **Task 6**: real-data fixtures (CSV/JSON replay) to improve scenario realism before adding live API clients.
 - **Task 5 follow-on**: message graph view in the dashboard once sender→recipient pairs are recorded in traces.
+- **Task 6 follow-on**: add more fixture variants and eventually live API ingestion once fixture schemas are stable.
