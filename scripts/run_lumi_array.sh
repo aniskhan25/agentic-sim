@@ -27,11 +27,22 @@ PYTHON="${PYTHON:-python3}"
 PROJECT_PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
 JOB_ID="${SLURM_ARRAY_JOB_ID:-${SLURM_JOB_ID:-local}}"
-CONFIG_LIST="${CONFIG_LIST:-configs/storm_small.json configs/supply_chain_small.json configs/storm_scale.json configs/supply_chain_scale.json}"
-read -r -a CONFIGS <<< "${CONFIG_LIST}"
+
+# Build config list from SWEEP_MANIFEST (generate-sweep output), a space-separated
+# CONFIG_LIST, or fall back to the default four built-in configs.
+if [[ -n "${SWEEP_MANIFEST:-}" ]]; then
+  mapfile -t CONFIGS < <(
+    PYTHONPATH="${PROJECT_PYTHONPATH}" "${PYTHON}" -c \
+      "import json,sys; [print(c) for c in json.load(open(sys.argv[1]))['configs']]" \
+      "${SWEEP_MANIFEST}"
+  )
+else
+  CONFIG_LIST="${CONFIG_LIST:-configs/storm_small.json configs/supply_chain_small.json configs/storm_scale.json configs/supply_chain_scale.json}"
+  read -r -a CONFIGS <<< "${CONFIG_LIST}"
+fi
 
 if (( TASK_ID < 0 || TASK_ID >= ${#CONFIGS[@]} )); then
-  echo "No config for SLURM_ARRAY_TASK_ID=${TASK_ID}; CONFIG_LIST has ${#CONFIGS[@]} entries" >&2
+  echo "No config for SLURM_ARRAY_TASK_ID=${TASK_ID}; ${#CONFIGS[@]} config(s) available" >&2
   exit 2
 fi
 

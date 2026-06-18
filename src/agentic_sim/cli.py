@@ -14,6 +14,7 @@ from agentic_sim.observability import (
     aggregate_run_artifacts,
     write_run_artifacts,
 )
+from agentic_sim.sweep import generate_sweep
 from agentic_sim.utils.env import load_env_files
 from agentic_sim.utils.serialization import to_jsonable
 
@@ -79,6 +80,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     aggregate.add_argument("root_dir", help="Directory containing run artifact subdirectories")
     aggregate.add_argument("--output", help="Write aggregate JSON to this path")
+
+    sweep = subcommands.add_parser(
+        "generate-sweep",
+        help="Generate a config file per sweep combination from a sweep spec",
+    )
+    sweep.add_argument("spec", help="Path to the sweep spec JSON file")
+    sweep.add_argument(
+        "--output-dir",
+        help="Directory to write generated configs and manifest (default: data/sweeps/<sweep_id>)",
+    )
     return parser
 
 
@@ -91,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_aitta_command(args)
     if args.command == "aggregate-runs":
         return aggregate_runs_command(args)
+    if args.command == "generate-sweep":
+        return generate_sweep_command(args)
     raise ValueError(args.command)
 
 
@@ -209,6 +222,22 @@ def check_aitta_command(args: argparse.Namespace) -> int:
 def aggregate_runs_command(args: argparse.Namespace) -> int:
     payload = aggregate_run_artifacts(args.root_dir, args.output)
     print(json.dumps(payload, indent=2))
+    return 0
+
+
+def generate_sweep_command(args: argparse.Namespace) -> int:
+    from pathlib import Path as _Path
+
+    manifest = generate_sweep(args.spec, output_dir=getattr(args, "output_dir", None))
+    print(json.dumps(manifest, indent=2))
+    n = manifest["total"]
+    manifest_path = str(_Path(manifest["configs"][0]).parent.parent / "sweep_manifest.json")
+    config_list = " ".join(manifest["configs"])
+    print(f"\n# {n} config(s) generated. To submit on LUMI:")
+    print(f"# Option A — pass config list directly:")
+    print(f'CONFIG_LIST="{config_list}" sbatch --array=0-{n - 1} scripts/run_lumi_array.sh')
+    print(f"# Option B — pass sweep manifest:")
+    print(f'SWEEP_MANIFEST="{manifest_path}" sbatch --array=0-{n - 1} scripts/run_lumi_array.sh')
     return 0
 
 
