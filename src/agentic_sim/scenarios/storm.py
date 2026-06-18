@@ -6,6 +6,7 @@ from agentic_sim.environment import StormEnvironment
 from agentic_sim.execution import BatchBuilder, create_execution_backend
 from agentic_sim.models import AgentId, AgentProfile
 from agentic_sim.scenarios.common import create_store, string_list
+from agentic_sim.scenarios.fixtures import FixtureLoader
 from agentic_sim.scheduling import FIFOScheduler
 from agentic_sim.state.base import RuntimeStore
 
@@ -122,8 +123,16 @@ def _storm_environment(
     operator_ids = [
         str(profile.agent_id) for profile in profiles if profile.role in {"hospital", "utility"}
     ]
+    fixture = FixtureLoader.load_if_configured(scenario_parameters)
+    regions = (
+        string_list(scenario_parameters.get("regions"))
+        or (list(fixture.initial.get("regions", [])) if fixture else None)
+        or None
+    )
     return StormEnvironment(
-        regions=string_list(scenario_parameters.get("regions")) or None,
+        regions=regions,
         severity_step=int(scenario_parameters.get("severity_step", 1)),
         operator_ids=operator_ids,
+        initial_variables=fixture.initial if fixture else None,
+        tick_data=fixture.ticks if fixture else None,
     )

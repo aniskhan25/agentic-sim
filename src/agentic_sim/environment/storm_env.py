@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from agentic_sim.models import (
     EnvironmentAction,
@@ -21,22 +22,27 @@ class StormEnvironment:
         severity_step: int = 1,
         coordinator_id: str = "agent_coordinator",
         operator_ids: list[str] | None = None,
+        initial_variables: dict[str, Any] | None = None,
+        tick_data: list[dict[str, Any]] | None = None,
     ):
         self.regions = regions or ["helsinki", "oulu"]
         self.severity_step = severity_step
         self.coordinator_id = coordinator_id
         self.operator_ids = operator_ids or ["agent_hospital", "agent_utility"]
+        self._initial_variables: dict[str, Any] = initial_variables or {}
+        self._tick_data: list[dict[str, Any]] = tick_data or []
 
     def initialize(self) -> EnvironmentState:
+        init = self._initial_variables
         return EnvironmentState(
             scenario="storm",
             tick=0,
             updated_at=utc_now(),
             variables={
-                "severity": 1,
+                "severity": int(init.get("severity", 1)),
                 "regions": self.regions,
-                "capacity": {region: 100 for region in self.regions},
-                "last_summary": "storm watch initialized",
+                "capacity": dict(init.get("capacity", {region: 100 for region in self.regions})),
+                "last_summary": str(init.get("last_summary", "storm watch initialized")),
             },
         )
 
@@ -64,11 +70,17 @@ class StormEnvironment:
         )
 
     def tick(self, state: EnvironmentState, now: datetime) -> EnvironmentTransitionResult:
-        severity = int(state.variables.get("severity", 1)) + self.severity_step
+        tick_entry = self._tick_data[state.tick] if state.tick < len(self._tick_data) else {}
+        severity = int(
+            tick_entry.get("severity", int(state.variables.get("severity", 1)) + self.severity_step)
+        )
+        affected_region = str(
+            tick_entry.get("affected_region", self.regions[(state.tick + 1) % len(self.regions)])
+        )
+        observation = str(tick_entry.get("observation", ""))
         variables = dict(state.variables)
         variables["severity"] = severity
-        variables["last_summary"] = f"storm severity increased to {severity}"
-        affected_region = self.regions[(state.tick + 1) % len(self.regions)]
+        variables["last_summary"] = observation or f"storm severity increased to {severity}"
         next_state = EnvironmentState(
             scenario=state.scenario,
             tick=state.tick + 1,
