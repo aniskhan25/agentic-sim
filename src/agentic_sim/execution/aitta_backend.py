@@ -212,11 +212,13 @@ def _system_prompt() -> str:
     return (
         "You are controlling one agent in an event-driven simulation. "
         "Return only valid JSON. Do not include markdown or explanatory text. "
-        "Keep all string values short. "
         "Allowed top-level keys: current_goal, working_memory, outgoing_messages, "
         "environment_actions, emitted_events, metadata. "
         "Messages require recipient_id, message_type, and optional priority and payload. "
         "Environment actions require action_type and optional payload. "
+        "Use the environment state, triggering event, and inbox messages to write specific, "
+        "context-aware content. Payload values should reflect actual conditions such as "
+        "severity, risk level, region, demand, or capacity — not generic placeholders. "
         "Follow the role_policy exactly; if it lists required outputs, include them."
     )
 
@@ -231,25 +233,203 @@ def _request_prompt(request: ExecutionRequest) -> str:
         "allowed_message_types": [item.value for item in MessageType],
         "allowed_event_types": [item.value for item in EventType],
         "role_policy": _role_policy(request),
-        "response_shape": {
-            "current_goal": "short string",
-            "working_memory": {"decision": "short string"},
-            "outgoing_messages": [
-                {
-                    "recipient_id": "agent id",
-                    "message_type": "status_request or status_update",
-                    "priority": request.triggering_event.priority,
-                    "payload": {},
-                }
-            ],
-            "environment_actions": [
-                {"action_type": "update_summary", "payload": {"summary": "short string"}}
-            ],
-            "emitted_events": [],
-            "metadata": {"policy_reason": "short string"},
-        },
+        "response_shape": _response_shape(request),
     }
     return json.dumps(payload, ensure_ascii=True, sort_keys=True)
+
+
+def _response_shape(request: ExecutionRequest) -> dict[str, Any]:
+    """Return a role- and scenario-specific example showing the expected output shape."""
+    role = request.agent_profile.role
+    scenario = request.environment.scenario
+    variables = request.environment.variables
+    event_payload = request.triggering_event.payload
+    priority = request.triggering_event.priority
+    agent_id = str(request.agent_profile.agent_id)
+    region = request.agent_profile.region or "unknown"
+
+    if scenario == "storm":
+        severity = int(variables.get("severity", 0))
+        regions = list(variables.get("regions", []))
+        regions_str = ", ".join(regions) if regions else "affected regions"
+        status = "strained" if severity >= 3 else "normal"
+
+        if role == "coordinator":
+            operator_ids = list(event_payload.get("operator_ids", []))
+            example_recipient = operator_ids[0] if operator_ids else "agent_hospital"
+            return {
+                "current_goal": f"Coordinate severity-{severity} storm response across {regions_str}",
+                "working_memory": {
+                    "decision": f"Requesting status from {len(operator_ids)} operator(s); severity {severity} requires immediate coordination"
+                },
+                "outgoing_messages": [
+                    {
+                        "recipient_id": example_recipient,
+                        "message_type": MessageType.STATUS_REQUEST.value,
+                        "priority": priority,
+                        "payload": {
+                            "severity": severity,
+                            "regions": regions,
+                            "coordinator_id": agent_id,
+                            "summary": f"Severity-{severity} storm event; report current capacity and operational status",
+                        },
+                    }
+                ],
+                "environment_actions": [
+                    {
+                        "action_type": "update_summary",
+                        "payload": {
+                            "summary": (
+                                f"Coordinator activated: severity-{severity} storm affecting {regions_str}; "
+                                f"status requested from {len(operator_ids)} operator(s)"
+                            )
+                        },
+                    }
+                ],
+                "emitted_events": [],
+                "metadata": {"policy_reason": f"Severity {severity} triggers mandatory coordination protocol"},
+            }
+
+        if role in {"hospital", "utility"}:
+            coordinator_id = event_payload.get("coordinator_id", "agent_coordinator")
+            capacity_note = "reduced capacity due to storm conditions" if severity >= 3 else "operating within normal parameters"
+            return {
+                "current_goal": f"Report {status} operational status to coordinator under severity-{severity} conditions",
+                "working_memory": {
+                    "decision": f"Severity {severity} {'exceeds' if severity >= 3 else 'is below'} threshold; reporting {status}"
+                },
+                "outgoing_messages": [
+                    {
+                        "recipient_id": coordinator_id,
+                        "message_type": MessageType.STATUS_UPDATE.value,
+                        "priority": priority,
+                        "payload": {
+                            "role": role,
+                            "region": region,
+                            "status": status,
+                            "severity": severity,
+                            "notes": capacity_note,
+                        },
+                    }
+                ],
+                "environment_actions": [],
+                "emitted_events": [],
+                "metadata": {"policy_reason": f"Severity {severity} {'requires strained' if severity >= 3 else 'allows normal'} status report"},
+            }
+
+        if role == "forecaster":
+            trend = "intensifying" if severity >= 4 else ("stable" if severity >= 2 else "weakening")
+            return {
+                "current_goal": f"Issue updated forecast for severity-{severity} storm",
+                "working_memory": {"decision": f"Storm is {trend}; updating environment with current assessment"},
+                "outgoing_messages": [],
+                "environment_actions": [
+                    {
+                        "action_type": "update_summary",
+                        "payload": {
+                            "summary": (
+                                f"Forecaster: severity-{severity} storm {trend}, "
+                                f"affecting {regions_str}; monitoring for escalation"
+                            )
+                        },
+                    }
+                ],
+                "emitted_events": [],
+                "metadata": {"policy_reason": f"Active severity-{severity} event requires forecast update"},
+            }
+
+    if scenario == "supply_chain":
+        risk_level = str(variables.get("risk_level", "normal"))
+        demand = variables.get("demand", 0)
+        status = "strained" if risk_level != "normal" else "normal"
+
+        if role == "coordinator":
+            operator_ids = list(event_payload.get("operator_ids", []))
+            example_recipient = operator_ids[0] if operator_ids else "agent_supplier"
+            return {
+                "current_goal": f"Coordinate supply chain response to {risk_level} risk conditions",
+                "working_memory": {
+                    "decision": f"Risk level {risk_level} with demand {demand}; contacting {len(operator_ids)} node(s)"
+                },
+                "outgoing_messages": [
+                    {
+                        "recipient_id": example_recipient,
+                        "message_type": MessageType.STATUS_REQUEST.value,
+                        "priority": priority,
+                        "payload": {
+                            "demand": demand,
+                            "risk_level": risk_level,
+                            "coordinator_id": agent_id,
+                            "summary": f"Risk level {risk_level} with demand {demand}; report operational status",
+                        },
+                    }
+                ],
+                "environment_actions": [
+                    {
+                        "action_type": "update_summary",
+                        "payload": {
+                            "summary": (
+                                f"Coordinator activated: {risk_level} risk, demand {demand}; "
+                                f"status requested from {len(operator_ids)} supply chain node(s)"
+                            )
+                        },
+                    }
+                ],
+                "emitted_events": [],
+                "metadata": {"policy_reason": f"Risk level {risk_level} triggers supply chain coordination"},
+            }
+
+        if role in {"supplier", "warehouse", "transport", "retailer"}:
+            coordinator_id = event_payload.get("coordinator_id", "agent_coordinator")
+            role_notes = {
+                "supplier": f"inventory pressure elevated at demand {demand}",
+                "warehouse": f"prioritising stock allocation for demand {demand}",
+                "transport": f"routing capacity {'stressed' if risk_level != 'normal' else 'nominal'} at demand {demand}",
+                "retailer": f"demand spike of {demand} exceeding normal levels" if risk_level != "normal" else f"demand {demand} within normal range",
+            }
+            notes = role_notes.get(role, f"operating under {risk_level} risk conditions")
+            messages = [
+                {
+                    "recipient_id": coordinator_id,
+                    "message_type": MessageType.STATUS_UPDATE.value,
+                    "priority": priority,
+                    "payload": {
+                        "role": role,
+                        "region": region,
+                        "status": status,
+                        "demand": demand,
+                        "risk_level": risk_level,
+                        "notes": notes,
+                    },
+                }
+            ]
+            actions: list[dict[str, Any]] = []
+            if risk_level != "normal":
+                allowed = _allowed_environment_actions(scenario, role)
+                if "adjust_inventory" in allowed:
+                    actions.append({"action_type": "adjust_inventory", "payload": {"region": region, "delta": 15}})
+                elif "adjust_transport_capacity" in allowed:
+                    actions.append({"action_type": "adjust_transport_capacity", "payload": {"delta": 5}})
+                elif "update_summary" in allowed:
+                    actions.append({"action_type": "update_summary", "payload": {"summary": f"{role} in {region} prioritising inventory under {risk_level} risk"}})
+            return {
+                "current_goal": f"Report {status} supply chain status as {role} in {region}",
+                "working_memory": {"decision": f"Risk level {risk_level} with demand {demand}; reporting {status} status"},
+                "outgoing_messages": messages,
+                "environment_actions": actions,
+                "emitted_events": [],
+                "metadata": {"policy_reason": f"Risk level {risk_level} requires {status} status report"},
+            }
+
+    # Fallback for unrecognised scenario/role combinations
+    return {
+        "current_goal": "Respond to triggering event",
+        "working_memory": {"decision": "processing event"},
+        "outgoing_messages": [],
+        "environment_actions": [],
+        "emitted_events": [],
+        "metadata": {"policy_reason": "following role policy"},
+    }
 
 
 def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
@@ -270,6 +450,11 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
                 "instruction": "Send a status_request to every operator_id in the triggering event payload.",
                 "operator_ids": list(event_payload.get("operator_ids", [])),
                 "message_type": MessageType.STATUS_REQUEST.value,
+                "payload_guidance": (
+                    "Include your agent_id as coordinator_id, the current severity or risk_level "
+                    "from environment variables, affected regions or demand, and a concise summary "
+                    "of the event so operators have context for their response."
+                ),
             }
         )
         policy["requirements"].append(
@@ -277,9 +462,14 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
                 "type": "environment_action",
                 "instruction": "Update the environment summary with the coordinator assessment.",
                 "action_type": "update_summary",
+                "payload_guidance": (
+                    "Write a one-sentence summary naming the event type, current severity or risk level, "
+                    "affected scope, and which operators you have contacted."
+                ),
             }
         )
     elif role in {"hospital", "utility"}:
+        severity = int(variables.get("severity", 0))
         policy["requirements"].append(
             {
                 "type": "outgoing_message",
@@ -287,7 +477,12 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
                 "recipient_id": event_payload.get("coordinator_id", "agent_coordinator"),
                 "message_type": MessageType.STATUS_UPDATE.value,
                 "status_rule": "Use strained when severity is 3 or higher; otherwise normal.",
-                "severity": variables.get("severity", 0),
+                "severity": severity,
+                "payload_guidance": (
+                    f"Set status to {'strained' if severity >= 3 else 'normal'}. "
+                    "Include your role, region, current severity, and a brief note on operational impact "
+                    f"(e.g. capacity constraints for hospital, service disruption for utility)."
+                ),
             }
         )
     elif role == "forecaster":
@@ -296,24 +491,42 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
                 "type": "environment_action",
                 "instruction": "Update the environment summary with a concise forecast assessment.",
                 "action_type": "update_summary",
+                "payload_guidance": (
+                    "Write a summary that names the current severity, affected regions, trend direction "
+                    "(intensifying / stable / weakening), and estimated time to peak impact. "
+                    "Base it on environment variables."
+                ),
             }
         )
     elif role in {"supplier", "warehouse", "transport", "retailer"}:
+        risk_level = str(variables.get("risk_level", "normal"))
         policy["requirements"].append(
             {
                 "type": "outgoing_message",
                 "instruction": "Send one status_update to the coordinator_id from the triggering event payload.",
                 "recipient_id": event_payload.get("coordinator_id", "agent_coordinator"),
                 "message_type": MessageType.STATUS_UPDATE.value,
-                "risk_level": variables.get("risk_level", "normal"),
+                "risk_level": risk_level,
+                "payload_guidance": (
+                    f"Set status to {'strained' if risk_level != 'normal' else 'normal'}. "
+                    "Include your role, region, current risk_level, demand value, and a brief note "
+                    "on operational impact relevant to your role "
+                    "(e.g. inventory pressure for supplier, routing delays for transport, "
+                    "stock prioritisation for warehouse, demand spike for retailer)."
+                ),
             }
         )
-        if variables.get("risk_level") != "normal":
+        if risk_level != "normal":
             policy["requirements"].append(
                 {
                     "type": "environment_action",
                     "instruction": "If your role has an allowed mitigation action, propose one.",
                     "allowed_actions": _allowed_environment_actions(scenario, role),
+                    "payload_guidance": (
+                        "Propose a concrete mitigation: specify a numeric delta for inventory or "
+                        "capacity adjustments, or write a one-sentence summary for update_summary. "
+                        "Use region from your agent_profile."
+                    ),
                 }
             )
     return policy
