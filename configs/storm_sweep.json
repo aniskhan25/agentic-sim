@@ -1,0 +1,11 @@
+{
+  "comment": "Sweep storm scenario across step counts and agent scale (9 combinations)",
+  "base": "configs/storm_small.json",
+  "axes": {
+    "steps": [4, 8, 16],
+    "agent_replicas": [1, 4, 16]
+  },
+  "fixed": {
+    "storage_mode": "sqlite"
+  }
+}
