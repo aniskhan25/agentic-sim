@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from typing import Any
 
 from agentic_sim.engine.clock import SimulationClock
 from agentic_sim.environment.base import Environment
@@ -135,6 +136,7 @@ class SimulationEngine:
                 "batches": len(batches),
                 "messages_emitted": emitted_messages,
                 "timing_ms": timings,
+                "backend": _tick_backend_summary(results),
             },
         )
         traces_written += 1
@@ -155,3 +157,28 @@ class SimulationEngine:
 
 def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 3)
+
+
+def _tick_backend_summary(results: list[ExecutionResult]) -> dict[str, Any]:
+    latencies: list[float] = []
+    retry_count = 0
+    validation_failures = 0
+    model_names: set[str] = set()
+    for result in results:
+        m = result.metadata
+        lat = m.get("latency_seconds")
+        if isinstance(lat, (int, float)):
+            latencies.append(float(lat))
+        retry_count += int(m.get("retry_count", 0))
+        if m.get("model_output_invalid"):
+            validation_failures += 1
+        model = m.get("model")
+        if isinstance(model, str):
+            model_names.add(model)
+    return {
+        "model": next(iter(model_names)) if len(model_names) == 1 else (sorted(model_names) or None),
+        "latency_seconds_total": round(sum(latencies), 3) if latencies else None,
+        "retry_count": retry_count,
+        "validation_failures": validation_failures,
+        "agent_steps": len(results),
+    }

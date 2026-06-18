@@ -149,6 +149,44 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(len(result.outgoing_messages), 1)
         self.assertEqual(result.outgoing_messages[0].message_type, MessageType.STATUS_REQUEST)
 
+    def test_retry_count_is_zero_when_first_attempt_succeeds(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_retries=2,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.metadata["retry_count"], 0)
+
+    def test_retry_count_reflects_number_of_retries_taken(self):
+        calls = []
+
+        def transport(url, headers, payload, timeout):
+            calls.append(1)
+            if len(calls) < 3:
+                raise OSError("transient failure")
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_retries=3,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(result.metadata["retry_count"], 2)
+
 
 def _request() -> ExecutionRequest:
     now = utc_now()
