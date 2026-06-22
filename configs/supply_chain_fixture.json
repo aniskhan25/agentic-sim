@@ -1,0 +1,11 @@
+{
+  "scenario": {
+    "name": "supply_chain",
+    "parameters": {
+      "fixture": "data/fixtures/supply_chain_nordic.json"
+    }
+  },
+  "steps": 6,
+  "execution": {"backend": "mock", "max_batch_size": 4},
+  "storage": {"mode": "memory"}
+}

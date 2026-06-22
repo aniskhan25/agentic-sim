@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from agentic_sim.environment import SupplyChainEnvironment
-from agentic_sim.execution import BatchBuilder, SupplyChainRuleBackend
+from agentic_sim.execution import BatchBuilder, create_execution_backend
 from agentic_sim.models import AgentId, AgentProfile
 from agentic_sim.scenarios.common import create_store, string_list
+from agentic_sim.scenarios.fixtures import FixtureLoader
 from agentic_sim.scheduling import FIFOScheduler
 from agentic_sim.state.base import RuntimeStore
 
@@ -40,6 +41,7 @@ def create_supply_chain_engine(
     max_events_per_tick: int = 32,
     agent_replicas: int = 1,
     scenario_parameters: dict[str, Any] | None = None,
+    backend_options: dict[str, Any] | None = None,
 ) -> SimulationEngine:
     scenario_parameters = scenario_parameters or {}
     profiles = _supply_chain_profiles(agent_replicas)
@@ -50,9 +52,11 @@ def create_supply_chain_engine(
         environment=environment.initialize(),
         profiles=profiles,
     )
-    if backend_name not in {"mock", "rule"}:
-        raise ValueError(f"unsupported backend {backend_name!r}")
-    backend = SupplyChainRuleBackend(name=backend_name)
+    backend = create_execution_backend(
+        backend_name,
+        scenario="supply_chain",
+        backend_options=backend_options,
+    )
     from agentic_sim.engine.simulation_engine import SimulationEngine
 
     return SimulationEngine(
@@ -125,9 +129,17 @@ def _supply_chain_environment(
     profiles: list[AgentProfile], scenario_parameters: dict[str, Any]
 ) -> SupplyChainEnvironment:
     operator_ids = [str(profile.agent_id) for profile in profiles if profile.role != "coordinator"]
+    fixture = FixtureLoader.load_if_configured(scenario_parameters)
+    regions = (
+        string_list(scenario_parameters.get("regions"))
+        or (list(fixture.initial.get("regions", [])) if fixture else None)
+        or None
+    )
     return SupplyChainEnvironment(
-        regions=string_list(scenario_parameters.get("regions")) or None,
+        regions=regions,
         demand_step=int(scenario_parameters.get("demand_step", 10)),
         delay_step=int(scenario_parameters.get("delay_step", 4)),
         operator_ids=operator_ids,
+        initial_variables=fixture.initial if fixture else None,
+        tick_data=fixture.ticks if fixture else None,
     )

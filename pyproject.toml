@@ -13,6 +13,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+dashboard = ["streamlit>=1.35", "pandas>=2"]
 
 [project.scripts]
 agentic-sim = "agentic_sim.cli:main"

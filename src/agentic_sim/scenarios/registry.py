@@ -27,6 +27,7 @@ def create_engine(
     max_events_per_tick: int = 32,
     agent_replicas: int = 1,
     scenario_parameters: dict[str, Any] | None = None,
+    backend_options: dict[str, Any] | None = None,
 ) -> SimulationEngine:
     try:
         factory = SCENARIOS[scenario]
@@ -41,6 +42,7 @@ def create_engine(
         "max_events_per_tick": max_events_per_tick,
         "agent_replicas": agent_replicas,
         "scenario_parameters": scenario_parameters,
+        "backend_options": backend_options,
     }
     if sqlite_path is not None:
         factory_kwargs["sqlite_path"] = sqlite_path
