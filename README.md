@@ -17,6 +17,7 @@ The code is intentionally small so the simulation loop can be inspected and test
 - In-memory storage for local runs.
 - SQLite storage for persisted runs.
 - Deterministic mock/rule execution backends.
+- Optional Aitta/OpenAI-compatible chat-completions execution backend.
 
 ## Quick Start
 
@@ -74,6 +75,16 @@ PYTHONPATH=src python3 -m agentic_sim.cli run \
   --output data/storm_scale_run.json
 ```
 
+Write split run artifacts for inspection or dashboard use:
+
+```bash
+PYTHONPATH=src python3 -m agentic_sim.cli run \
+  --config configs/storm_small.json \
+  --output-dir data/runs/storm-small
+```
+
+The directory contains `metadata.json`, `config.json`, `summary.json`, `ticks.json`, `environment.json`, `traces.json`, and `backend_metrics.json`.
+
 Use SQLite storage explicitly:
 
 ```bash
@@ -93,6 +104,27 @@ PYTHONPATH=src python3 -m agentic_sim.cli run \
   --steps 50 \
   --agent-replicas 128 \
   --max-batch-size 64
+```
+
+Use the Aitta backend through an OpenAI-compatible chat-completions endpoint:
+
+```bash
+cp .env.example .env.local
+# Edit .env.local and set AITTA_API_KEY plus any model override.
+
+PYTHONPATH=src python3 -m agentic_sim.cli check-aitta
+
+# If Aitta needs to start the model-serving job, poll until it is ready.
+PYTHONPATH=src python3 -m agentic_sim.cli check-aitta \
+  --wait \
+  --wait-timeout 900 \
+  --wait-interval 30
+
+PYTHONPATH=src python3 -m agentic_sim.cli run \
+  --scenario storm \
+  --backend aitta \
+  --steps 1 \
+  --max-batch-size 1
 ```
 
 ## Adding Scenarios
@@ -154,6 +186,8 @@ When `--output` is set, the artifact includes:
 - `environment`: final environment state.
 - `traces`: structured trace records, including `simulation_tick` timing fields.
 
+When `--output-dir` is set, the same run data is split into stable JSON files for downstream tools and dashboards.
+
 ## LUMI
 
 For LUMI-oriented batch runs, see [docs/lumi.md](docs/lumi.md) and `scripts/run_lumi.sh`.
@@ -194,6 +228,7 @@ Additional docs:
 - [docs/scenario_storm.md](docs/scenario_storm.md): storm scenario details.
 - [docs/scenario_supply_chain.md](docs/scenario_supply_chain.md): supply-chain scenario details.
 - [docs/lumi.md](docs/lumi.md): LUMI batch runs.
+- [docs/roadmap.md](docs/roadmap.md): next and future implementation plan.
 - [docs/amd_vllm_lumi_tuning.md](docs/amd_vllm_lumi_tuning.md): future AMD/vLLM throughput knobs.
 
 The engine treats reasoning as a pluggable backend behind a stable execution contract. That keeps the simulation inspectable and lets model serving be added later without changing the core loop.
@@ -203,7 +238,7 @@ The engine treats reasoning as a pluggable backend behind a stable execution con
 The current repo does not include:
 
 - distributed execution
-- remote LLM serving
+- production model-serving orchestration
 - training
 - vector databases
 - real weather data

@@ -1,0 +1,11 @@
+{
+  "scenario": {
+    "name": "storm",
+    "parameters": {
+      "fixture": "data/fixtures/storm_helsinki_oulu.json"
+    }
+  },
+  "steps": 6,
+  "execution": {"backend": "mock", "max_batch_size": 4},
+  "storage": {"mode": "memory"}
+}

@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "description": "Synthetic winter storm scenario: Gulf of Finland low-pressure system making landfall",
+    "scenario": "storm",
+    "source": "synthetic",
+    "version": "1"
+  },
+  "initial": {
+    "severity": 1,
+    "regions": ["helsinki", "oulu"],
+    "capacity": {"helsinki": 95, "oulu": 100},
+    "last_summary": "Storm watch: low pressure system approaching from the west"
+  },
+  "ticks": [
+    {
+      "severity": 2,
+      "affected_region": "helsinki",
+      "observation": "Low pressure deepening offshore; coastal wind gusts reaching 15 m/s, light snowfall beginning"
+    },
+    {
+      "severity": 3,
+      "affected_region": "oulu",
+      "observation": "Storm front reaching northern coast; heavy snowfall, visibility below 200 m on highway E75"
+    },
+    {
+      "severity": 4,
+      "affected_region": "helsinki",
+      "observation": "Power lines down in Greater Helsinki area; hospital backup generators activated, tram network suspended"
+    },
+    {
+      "severity": 5,
+      "affected_region": "oulu",
+      "observation": "Severe blizzard conditions in Oulu; major road closures, electricity grid under critical stress"
+    },
+    {
+      "severity": 4,
+      "affected_region": "helsinki",
+      "observation": "Storm peak passing Helsinki; conditions still hazardous but wind speed decreasing, repair crews mobilised"
+    },
+    {
+      "severity": 3,
+      "affected_region": "oulu",
+      "observation": "Recovery phase in Oulu: grid restoration ongoing, main roads reopening, hospital capacity stabilising"
+    }
+  ]
+}
