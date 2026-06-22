@@ -67,7 +67,7 @@ class SupplyChainRuleBackend(MockExecutionBackend):
         )
 
     def _operator_result(self, request: ExecutionRequest, state: AgentState) -> ExecutionResult:
-        coordinator_id = request.triggering_event.payload.get("coordinator_id", "agent_coordinator")
+        coordinator_id = request.triggering_event.payload.get("coordinator_id") or request.triggering_event.payload.get("sender_id", "agent_coordinator")
         variables = request.environment.variables
         role = request.agent_profile.role
         region = request.agent_profile.region

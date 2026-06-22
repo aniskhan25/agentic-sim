@@ -141,8 +141,9 @@ class AittaExecutionBackend:
         metadata.update(_optional_dict(proposal, "metadata"))
         messages = _messages(request, proposal.get("outgoing_messages", []))
         actions = _environment_actions(proposal.get("environment_actions", []))
-        messages, added_messages = _ensure_required_messages(request, messages)
-        actions, added_actions = _ensure_required_actions(request, actions)
+        policy = _role_policy(request)
+        messages, added_messages = _ensure_required_messages(request, messages, policy)
+        actions, added_actions = _ensure_required_actions(request, actions, policy)
         metadata["policy_guard_added_messages"] = added_messages
         metadata["policy_guard_added_actions"] = added_actions
         return ExecutionResult(
@@ -291,7 +292,7 @@ def _response_shape(request: ExecutionRequest) -> dict[str, Any]:
             }
 
         if role in {"hospital", "utility"}:
-            coordinator_id = event_payload.get("coordinator_id", "agent_coordinator")
+            coordinator_id = event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator")
             capacity_note = "reduced capacity due to storm conditions" if severity >= 3 else "operating within normal parameters"
             return {
                 "current_goal": f"Report {status} operational status to coordinator under severity-{severity} conditions",
@@ -380,7 +381,7 @@ def _response_shape(request: ExecutionRequest) -> dict[str, Any]:
             }
 
         if role in {"supplier", "warehouse", "transport", "retailer"}:
-            coordinator_id = event_payload.get("coordinator_id", "agent_coordinator")
+            coordinator_id = event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator")
             role_notes = {
                 "supplier": f"inventory pressure elevated at demand {demand}",
                 "warehouse": f"prioritising stock allocation for demand {demand}",
@@ -474,7 +475,7 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
             {
                 "type": "outgoing_message",
                 "instruction": "Send one status_update to the coordinator_id from the triggering event payload.",
-                "recipient_id": event_payload.get("coordinator_id", "agent_coordinator"),
+                "recipient_id": event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator"),
                 "message_type": MessageType.STATUS_UPDATE.value,
                 "status_rule": "Use strained when severity is 3 or higher; otherwise normal.",
                 "severity": severity,
@@ -504,7 +505,7 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
             {
                 "type": "outgoing_message",
                 "instruction": "Send one status_update to the coordinator_id from the triggering event payload.",
-                "recipient_id": event_payload.get("coordinator_id", "agent_coordinator"),
+                "recipient_id": event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator"),
                 "message_type": MessageType.STATUS_UPDATE.value,
                 "risk_level": risk_level,
                 "payload_guidance": (
@@ -517,18 +518,20 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
             }
         )
         if risk_level != "normal":
-            policy["requirements"].append(
-                {
-                    "type": "environment_action",
-                    "instruction": "If your role has an allowed mitigation action, propose one.",
-                    "allowed_actions": _allowed_environment_actions(scenario, role),
-                    "payload_guidance": (
-                        "Propose a concrete mitigation: specify a numeric delta for inventory or "
-                        "capacity adjustments, or write a one-sentence summary for update_summary. "
-                        "Use region from your agent_profile."
-                    ),
-                }
-            )
+            allowed = _allowed_environment_actions(scenario, role)
+            if allowed:
+                policy["requirements"].append(
+                    {
+                        "type": "environment_action",
+                        "action_type": allowed[0],
+                        "instruction": "Propose one mitigation action relevant to your role.",
+                        "payload_guidance": (
+                            "Propose a concrete mitigation: specify a numeric delta for inventory or "
+                            "capacity adjustments, or write a one-sentence summary for update_summary. "
+                            "Use region from your agent_profile."
+                        ),
+                    }
+                )
     return policy
 
 
@@ -645,9 +648,9 @@ def _events(request: ExecutionRequest, value: Any) -> list[Event]:
 
 
 def _ensure_required_messages(
-    request: ExecutionRequest, messages: list[Message]
+    request: ExecutionRequest, messages: list[Message], policy: dict[str, Any]
 ) -> tuple[list[Message], int]:
-    required = _required_messages(request)
+    required = _required_messages(request, policy)
     existing = {(str(message.recipient_id), message.message_type) for message in messages}
     added = []
     for message in required:
@@ -659,9 +662,9 @@ def _ensure_required_messages(
 
 
 def _ensure_required_actions(
-    request: ExecutionRequest, actions: list[EnvironmentAction]
+    request: ExecutionRequest, actions: list[EnvironmentAction], policy: dict[str, Any]
 ) -> tuple[list[EnvironmentAction], int]:
-    required = _required_actions(request)
+    required = _required_actions(request, policy)
     existing = {action.action_type for action in actions}
     added = []
     for action in required:
@@ -671,89 +674,57 @@ def _ensure_required_actions(
     return actions + added, len(added)
 
 
-def _required_messages(request: ExecutionRequest) -> list[Message]:
-    role = request.agent_profile.role
-    if role == "coordinator":
-        return [
-            Message.create(
+def _required_messages(request: ExecutionRequest, policy: dict[str, Any]) -> list[Message]:
+    messages = []
+    for req in policy.get("requirements", []):
+        req_type = req.get("type", "")
+        if req_type == "outgoing_messages":
+            for agent_id in req.get("operator_ids", []):
+                messages.append(Message.create(
+                    sender_id=request.agent_profile.agent_id,
+                    recipient_id=AgentId(agent_id),
+                    message_type=MessageType(req["message_type"]),
+                    priority=request.triggering_event.priority,
+                    payload=_status_request_payload(request),
+                    correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
+                ))
+        elif req_type == "outgoing_message":
+            messages.append(Message.create(
                 sender_id=request.agent_profile.agent_id,
-                recipient_id=AgentId(agent_id),
-                message_type=MessageType.STATUS_REQUEST,
-                priority=request.triggering_event.priority,
-                payload=_status_request_payload(request),
-                correlation_id=request.triggering_event.correlation_id
-                or request.triggering_event.event_id,
-            )
-            for agent_id in request.triggering_event.payload.get("operator_ids", [])
-        ]
-    if role in {"hospital", "utility", "supplier", "warehouse", "transport", "retailer"}:
-        return [
-            Message.create(
-                sender_id=request.agent_profile.agent_id,
-                recipient_id=AgentId(
-                    request.triggering_event.payload.get("coordinator_id", "agent_coordinator")
-                ),
-                message_type=MessageType.STATUS_UPDATE,
+                recipient_id=AgentId(req["recipient_id"]),
+                message_type=MessageType(req["message_type"]),
                 priority=request.triggering_event.priority,
                 payload=_status_update_payload(request),
-                correlation_id=request.triggering_event.correlation_id
-                or request.triggering_event.event_id,
-            )
-        ]
-    return []
+                correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
+            ))
+    return messages
 
 
-def _required_actions(request: ExecutionRequest) -> list[EnvironmentAction]:
-    role = request.agent_profile.role
-    variables = request.environment.variables
-    if role == "coordinator":
-        return [
-            EnvironmentAction(
-                action_type="update_summary",
-                payload={
-                    "summary": (
-                        f"coordinator reviewed {request.environment.scenario} "
-                        f"event {request.triggering_event.event_type.value}"
-                    )
-                },
-            )
-        ]
-    if role == "forecaster":
-        return [
-            EnvironmentAction(
-                action_type="update_summary",
-                payload={
-                    "summary": (
-                        "forecast reviewed severity "
-                        f"{variables.get('severity', variables.get('risk_level', 'unknown'))}"
-                    )
-                },
-            )
-        ]
-    if request.environment.scenario == "supply_chain" and variables.get("risk_level") != "normal":
-        region = request.agent_profile.region
-        if role == "supplier":
-            return [
-                EnvironmentAction(
-                    action_type="adjust_inventory",
-                    payload={"region": region, "delta": 15},
-                )
-            ]
-        if role == "transport":
-            return [
-                EnvironmentAction(
-                    action_type="adjust_transport_capacity",
-                    payload={"delta": 5},
-                )
-            ]
-        if role == "warehouse":
-            return [
-                EnvironmentAction(
-                    action_type="update_summary",
-                    payload={"summary": f"warehouse prioritizing inventory for {region}"},
-                )
-            ]
-    return []
+def _required_actions(request: ExecutionRequest, policy: dict[str, Any]) -> list[EnvironmentAction]:
+    actions = []
+    for req in policy.get("requirements", []):
+        if req.get("type") != "environment_action":
+            continue
+        action_type = req["action_type"]
+        actions.append(EnvironmentAction(
+            action_type=action_type,
+            payload=_action_payload(request, action_type),
+        ))
+    return actions
+
+
+def _action_payload(request: ExecutionRequest, action_type: str) -> dict[str, Any]:
+    if action_type == "adjust_inventory":
+        return {"region": request.agent_profile.region, "delta": 15}
+    if action_type == "adjust_transport_capacity":
+        return {"delta": 5}
+    return {
+        "summary": (
+            f"{request.agent_profile.role} reviewed "
+            f"{request.environment.scenario} "
+            f"event {request.triggering_event.event_type.value}"
+        )
+    }
 
 
 def _status_request_payload(request: ExecutionRequest) -> dict[str, Any]:

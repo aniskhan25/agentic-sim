@@ -26,8 +26,6 @@ class Message:
     priority: int
     created_at: datetime
     payload: dict[str, Any] = field(default_factory=dict)
-    thread_id: str | None = None
-    reply_to: str | None = None
     correlation_id: str | None = None
 
     @classmethod
@@ -39,8 +37,6 @@ class Message:
         message_type: MessageType,
         payload: dict[str, Any] | None = None,
         priority: int = 0,
-        thread_id: str | None = None,
-        reply_to: str | None = None,
         correlation_id: str | None = None,
     ) -> "Message":
         return cls(
@@ -51,7 +47,5 @@ class Message:
             priority=priority,
             created_at=utc_now(),
             payload=payload or {},
-            thread_id=thread_id,
-            reply_to=reply_to,
             correlation_id=correlation_id,
         )
