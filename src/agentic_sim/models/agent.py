@@ -10,8 +10,6 @@ AgentId = NewType("AgentId", str)
 
 class AgentStatus(StrEnum):
     IDLE = "idle"
-    ACTIVE = "active"
-    PAUSED = "paused"
 
 
 @dataclass(slots=True)

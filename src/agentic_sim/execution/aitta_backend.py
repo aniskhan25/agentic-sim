@@ -101,7 +101,7 @@ class AittaExecutionBackend:
         for attempt in range(self.max_retries + 1):
             try:
                 return self.transport(url, headers, payload, self.timeout_seconds), attempt
-            except Exception as exc:  # pragma: no cover - exercised by caller behavior
+            except Exception as exc:
                 last_error = exc
         raise RuntimeError(
             f"Aitta request failed after {self.max_retries + 1} attempt(s): {last_error}"
@@ -138,7 +138,7 @@ class AittaExecutionBackend:
             "retry_count": retry_count,
             "usage": response.get("usage"),
         }
-        metadata.update(_dict_value(proposal, "metadata"))
+        metadata.update(_optional_dict(proposal, "metadata"))
         messages = _messages(request, proposal.get("outgoing_messages", []))
         actions = _environment_actions(proposal.get("environment_actions", []))
         messages, added_messages = _ensure_required_messages(request, messages)
@@ -547,9 +547,10 @@ def _first_choice_text(response: dict[str, Any]) -> str:
 def _json_object(text: str) -> dict[str, Any]:
     cleaned = text.strip()
     if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:]
+        lines = cleaned.splitlines()
+        start = 1  # skip opening fence line (```json or ```)
+        end = len(lines) if lines[-1].strip() != "```" else len(lines) - 1
+        cleaned = "\n".join(lines[start:end])
     data = json.loads(cleaned)
     if not isinstance(data, dict):
         raise ValueError("Aitta output must be a JSON object")
@@ -561,7 +562,7 @@ def _updated_state(request: ExecutionRequest, proposal: dict[str, Any]) -> Agent
     memory = dict(state.working_memory)
     memory["last_event_type"] = request.triggering_event.event_type.value
     memory["last_environment_tick"] = request.environment.tick
-    memory.update(_dict_value(proposal, "working_memory"))
+    memory.update(_optional_dict(proposal, "working_memory"))
     current_goal = proposal.get("current_goal")
     return AgentState(
         agent_id=state.agent_id,
@@ -809,15 +810,6 @@ def _allowed_environment_actions(scenario: str, role: str) -> list[str]:
     if scenario == "supply_chain" and role == "transport":
         return ["adjust_transport_capacity"]
     return []
-
-
-def _dict_value(data: dict[str, Any], key: str) -> dict[str, Any]:
-    value = data.get(key, {})
-    if value is None:
-        return {}
-    if not isinstance(value, dict):
-        raise ValueError(f"{key} must be an object")
-    return dict(value)
 
 
 def _optional_dict(data: dict[str, Any], key: str) -> dict[str, Any]:

@@ -3,7 +3,7 @@ import unittest
 from agentic_sim.environment import StormEnvironment
 from agentic_sim.engine import create_storm_engine
 from agentic_sim.models import EventType
-from agentic_sim.observability import RunSummaryBuilder
+from agentic_sim.observability import build_run_summary
 from agentic_sim.utils.time import utc_now
 
 
@@ -12,7 +12,7 @@ class StormScenarioTests(unittest.TestCase):
         engine = create_storm_engine(backend_name="rule")
         engine.run(4)
 
-        summary = RunSummaryBuilder().build(engine.store)
+        summary = build_run_summary(engine.store)
 
         self.assertGreaterEqual(summary.messages, 2)
         self.assertGreaterEqual(summary.pending_events, 0)
