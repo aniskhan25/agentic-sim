@@ -20,7 +20,7 @@ class ContextBuilder:
             activation=activation,
             agent_profile=profile,
             agent_state=state,
-            inbox_messages=store.messages.inbox(activation.agent_id, limit=self.inbox_limit),
+            inbox_messages=store.messages.inbox(activation.agent_id, limit=self.inbox_limit, after=state.inbox_cursor),
             triggering_event=triggering_event,
             environment=store.environment.get(),
             backend_hint=profile.backend,

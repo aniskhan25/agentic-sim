@@ -114,7 +114,6 @@ class SimulationEngine:
                 self.store.environment.get(), environment_actions
             )
             self.store.environment.put(transition.state)
-            self.store.events.put_many(transition.emitted_events)
             emitted_events.extend(transition.emitted_events)
         timings["environment_actions_ms"] = _elapsed_ms(started)
 
