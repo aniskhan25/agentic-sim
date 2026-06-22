@@ -8,8 +8,7 @@ from agentic_sim.environment.base import Environment
 from agentic_sim.execution import BatchBuilder, ContextBuilder
 from agentic_sim.execution.base import ExecutionBackend
 from agentic_sim.messaging import MessageRouter
-from agentic_sim.models import Event, ExecutionResult, SimulationTickResult
-from agentic_sim.observability import TraceWriter
+from agentic_sim.models import Event, ExecutionResult, SimulationTickResult, TraceRecord
 from agentic_sim.scheduling import SchedulerInput
 from agentic_sim.scheduling.base import Scheduler
 from agentic_sim.state.base import RuntimeStore
@@ -29,7 +28,6 @@ class SimulationEngine:
         context_builder: ContextBuilder | None = None,
         batch_builder: BatchBuilder | None = None,
         router: MessageRouter | None = None,
-        tracer: TraceWriter | None = None,
         max_events_per_tick: int = 32,
     ):
         self.store = store
@@ -40,7 +38,6 @@ class SimulationEngine:
         self.context_builder = context_builder or ContextBuilder()
         self.batch_builder = batch_builder or BatchBuilder()
         self.router = router or MessageRouter()
-        self.tracer = tracer or TraceWriter()
         self.max_events_per_tick = max_events_per_tick
 
     def run(self, steps: int) -> list[SimulationTickResult]:
@@ -99,16 +96,15 @@ class SimulationEngine:
             self.router.deliver(result.outgoing_messages, self.store)
             environment_actions.extend(result.environment_actions)
             emitted_events.extend(result.emitted_events)
-            self.tracer.write(
-                self.store,
-                "agent_step",
-                {
+            self.store.traces.put(TraceRecord.create(
+                event_name="agent_step",
+                payload={
                     "agent_id": str(result.agent_id),
                     "messages": len(result.outgoing_messages),
                     "environment_actions": len(result.environment_actions),
                     "metadata": result.metadata,
                 },
-            )
+            ))
             traces_written += 1
         timings["result_application_ms"] = _elapsed_ms(started)
 
@@ -126,10 +122,9 @@ class SimulationEngine:
         self.store.events.put_many(emitted_events)
         timings["event_persistence_ms"] = _elapsed_ms(started)
         timings["total_ms"] = _elapsed_ms(step_start)
-        self.tracer.write(
-            self.store,
-            "simulation_tick",
-            {
+        self.store.traces.put(TraceRecord.create(
+            event_name="simulation_tick",
+            payload={
                 "tick": self.store.environment.get().tick,
                 "processed_events": len(ready_events),
                 "activations": len(activations),
@@ -138,7 +133,7 @@ class SimulationEngine:
                 "timing_ms": timings,
                 "backend": _tick_backend_summary(results),
             },
-        )
+        ))
         traces_written += 1
         self.clock.advance()
         return SimulationTickResult(

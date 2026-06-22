@@ -10,8 +10,8 @@ from agentic_sim.config import load_config, merge_cli
 from agentic_sim.engine import create_engine
 from agentic_sim.execution import check_aitta_connection
 from agentic_sim.observability import (
-    RunSummaryBuilder,
     aggregate_run_artifacts,
+    build_run_summary,
     write_run_artifacts,
 )
 from agentic_sim.sweep import generate_sweep
@@ -134,7 +134,7 @@ def run_command(args: argparse.Namespace) -> int:
         backend_options=config.backend_options,
     )
     tick_results = engine.run(config.steps)
-    summary = RunSummaryBuilder().build(engine.store)
+    summary = build_run_summary(engine.store)
     payload = {
         "ticks": [to_jsonable(result) for result in tick_results],
         "summary": to_jsonable(asdict(summary)),
@@ -226,12 +226,10 @@ def aggregate_runs_command(args: argparse.Namespace) -> int:
 
 
 def generate_sweep_command(args: argparse.Namespace) -> int:
-    from pathlib import Path as _Path
-
     manifest = generate_sweep(args.spec, output_dir=getattr(args, "output_dir", None))
     print(json.dumps(manifest, indent=2))
     n = manifest["total"]
-    manifest_path = str(_Path(manifest["configs"][0]).parent.parent / "sweep_manifest.json")
+    manifest_path = str(Path(manifest["configs"][0]).parent.parent / "sweep_manifest.json")
     config_list = " ".join(manifest["configs"])
     print(f"\n# {n} config(s) generated. To submit on LUMI:")
     print(f"# Option A — pass config list directly:")

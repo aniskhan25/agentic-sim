@@ -60,7 +60,6 @@ class ExecutionResult:
     outgoing_messages: list[Message] = field(default_factory=list)
     environment_actions: list[EnvironmentAction] = field(default_factory=list)
     emitted_events: list[Event] = field(default_factory=list)
-    tool_requests: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
