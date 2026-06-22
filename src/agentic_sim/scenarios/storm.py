@@ -123,6 +123,9 @@ def _storm_environment(
     operator_ids = [
         str(profile.agent_id) for profile in profiles if profile.role in {"hospital", "utility"}
     ]
+    utility_operator_ids = [
+        str(profile.agent_id) for profile in profiles if profile.role == "utility"
+    ]
     fixture = FixtureLoader.load_if_configured(scenario_parameters)
     regions = (
         string_list(scenario_parameters.get("regions"))
@@ -133,6 +136,7 @@ def _storm_environment(
         regions=regions,
         severity_step=int(scenario_parameters.get("severity_step", 1)),
         operator_ids=operator_ids,
+        utility_operator_ids=utility_operator_ids,
         initial_variables=fixture.initial if fixture else None,
         tick_data=fixture.ticks if fixture else None,
     )

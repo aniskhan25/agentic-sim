@@ -22,6 +22,7 @@ class StormEnvironment:
         severity_step: int = 1,
         coordinator_id: str = "agent_coordinator",
         operator_ids: list[str] | None = None,
+        utility_operator_ids: list[str] | None = None,
         initial_variables: dict[str, Any] | None = None,
         tick_data: list[dict[str, Any]] | None = None,
     ):
@@ -29,6 +30,7 @@ class StormEnvironment:
         self.severity_step = severity_step
         self.coordinator_id = coordinator_id
         self.operator_ids = operator_ids or ["agent_hospital", "agent_utility"]
+        self.utility_operator_ids = utility_operator_ids or ["agent_utility"]
         self._initial_variables: dict[str, Any] = initial_variables or {}
         self._tick_data: list[dict[str, Any]] = tick_data or []
 
@@ -113,9 +115,7 @@ class StormEnvironment:
                         "region": affected_region,
                         "outage_level": "major" if severity >= 5 else "localized",
                         "coordinator_id": self.coordinator_id,
-                        "operator_ids": [
-                            agent_id for agent_id in self.operator_ids if "utility" in agent_id
-                        ],
+                        "operator_ids": self.utility_operator_ids,
                         "summary": f"grid outage risk in {affected_region}",
                     },
                     priority=severity + 1,
