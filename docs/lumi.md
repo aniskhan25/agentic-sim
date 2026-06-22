@@ -1,6 +1,27 @@
 # LUMI Runs
 
-The runtime is still single-process by design. The LUMI preparation here is for reproducible batch runs, trace capture, and scale smoke tests before adding model-serving backends.
+This demonstrator shows that LUMI can run multi-agent LLM workflows with real simulation semantics: event-driven coordination, role-differentiated agents, structured messaging, and persistent traces. Runs are submitted as standard SLURM jobs; independent simulations scale across array tasks without any distributed runtime.
+
+## Demo Run
+
+`configs/demo_lumi.json` is the canonical showcase run: a realistic 6-tick Gulf of Finland winter storm, 64 agent replicas (coordinator + hospital/utility operators + forecasters), and the Aitta backend. It demonstrates role-differentiated LLM-backed agents responding to an escalating storm event, coordinating via structured messages, and persisting all decisions and traces to SQLite. The run completes within a 15-minute SLURM time limit.
+
+```bash
+# Set credentials first
+cp .env.example .env.local
+# Edit .env.local: AITTA_API_KEY, AITTA_BASE_URL, AITTA_MODEL
+
+CONFIG=configs/demo_lumi.json \
+ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
+  sbatch scripts/run_lumi.sh
+```
+
+What to look at in the output:
+
+- `summary.json` — final agent activation counts and message totals across the 6 ticks
+- `ticks.json` — per-step events processed, activations, and messages; shows the storm escalation arc
+- `backend_metrics.json` — Aitta latency and validation stats per agent step
+- `traces.json` — full structured trace records; filter by `event_name: "agent_step"` to see individual LLM decisions with their metadata
 
 ## Local Scale Smoke Test
 
@@ -98,5 +119,31 @@ Each run writes:
 - Slurm stdout under `/scratch/project_462000131/anisrahm/agentic-sim-%j.out`, or under the path passed with `sbatch --output`
 
 The `simulation_tick` trace payload includes timing fields for event loading, scheduling, context building, batching, backend execution, result application, environment actions, event persistence, and total step time.
+
+## Scale Characterisation Sweeps
+
+Two sweep specs measure how the simulation scales with agent count.
+
+**Mock backend** (15 combinations — 5 agent counts × 3 step counts, no credentials needed):
+
+```bash
+agentic-sim generate-sweep configs/scale_sweep_mock.json
+# Follow the printed sbatch command, e.g.:
+SWEEP_MANIFEST="data/sweeps/<sweep_id>/sweep_manifest.json" \
+ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
+  sbatch --array=0-14 scripts/run_lumi_array.sh
+```
+
+**Aitta backend** (5 combinations — 5 agent counts at fixed 8 steps):
+
+```bash
+agentic-sim generate-sweep configs/scale_sweep_aitta.json
+AITTA_WARMUP=1 \
+SWEEP_MANIFEST="data/sweeps/<sweep_id>/sweep_manifest.json" \
+ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
+  sbatch --array=0-4 scripts/run_lumi_array.sh
+```
+
+After the array completes, `aggregate.json` in the run root collects wall time and backend metrics across all tasks. The key numbers to extract: total wall time and agent-steps per second at each agent count.
 
 For future vLLM/ROCm serving integration, see `docs/amd_vllm_lumi_tuning.md`.

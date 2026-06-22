@@ -1,0 +1,22 @@
+{
+  "comment": "Curated demo run for LUMI. Storm scenario with a realistic 6-tick fixture, 64 agents, Aitta backend. Completes within a 15-minute SLURM time limit. See docs/lumi.md for submission instructions and how to read the output.",
+  "scenario": {
+    "name": "storm",
+    "agent_replicas": 64,
+    "parameters": {
+      "fixture": "data/fixtures/storm_helsinki_oulu.json"
+    }
+  },
+  "steps": 6,
+  "scheduler": {
+    "policy": "fifo",
+    "max_events_per_tick": 512
+  },
+  "execution": {
+    "backend": "aitta",
+    "max_batch_size": 32
+  },
+  "storage": {
+    "mode": "sqlite"
+  }
+}

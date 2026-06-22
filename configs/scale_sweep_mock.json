@@ -1,0 +1,13 @@
+{
+  "comment": "Scale characterisation sweep — mock backend. 15 combinations: 5 agent counts x 3 step counts. Submit with: agentic-sim generate-sweep configs/scale_sweep_mock.json",
+  "base": "configs/storm_scale.json",
+  "axes": {
+    "agent_replicas": [8, 32, 64, 128, 256],
+    "steps": [4, 8, 16]
+  },
+  "fixed": {
+    "backend": "mock",
+    "storage_mode": "sqlite",
+    "max_batch_size": 128
+  }
+}
