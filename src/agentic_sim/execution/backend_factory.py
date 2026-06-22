@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from agentic_sim.execution.aitta_backend import AittaExecutionBackend
-from agentic_sim.execution.mock_backend import MockExecutionBackend
-from agentic_sim.execution.rule_backend import RuleExecutionBackend
-from agentic_sim.execution.supply_chain_backend import SupplyChainRuleBackend
 from agentic_sim.execution.base import ExecutionBackend
+from agentic_sim.execution.mock_backend import MockExecutionBackend
+from agentic_sim.execution.supply_chain_backend import SupplyChainRuleBackend
 
 
 def create_execution_backend(
@@ -30,8 +29,6 @@ def create_execution_backend(
         )
     if scenario == "supply_chain" and backend_name in {"mock", "rule"}:
         return SupplyChainRuleBackend(name=backend_name)
-    if scenario == "storm" and backend_name == "rule":
-        return RuleExecutionBackend()
-    if scenario == "storm" and backend_name == "mock":
+    if scenario == "storm" and backend_name in {"mock", "rule"}:
         return MockExecutionBackend()
     raise ValueError(f"unsupported backend {backend_name!r}")

@@ -2,7 +2,7 @@ import unittest
 from dataclasses import asdict
 
 from agentic_sim.engine import create_storm_engine
-from agentic_sim.observability import RunSummaryBuilder
+from agentic_sim.observability import build_run_summary
 from agentic_sim.utils.serialization import to_jsonable
 
 
@@ -16,7 +16,7 @@ class ReplayTests(unittest.TestCase):
     def _run_signature(self):
         engine = create_storm_engine()
         ticks = engine.run(5)
-        summary = RunSummaryBuilder().build(engine.store)
+        summary = build_run_summary(engine.store)
         traces = engine.store.traces.list()
         return {
             "ticks": [to_jsonable(tick) for tick in ticks],
