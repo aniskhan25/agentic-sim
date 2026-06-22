@@ -62,13 +62,13 @@ ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
 
 ### A. Scale characterisation sweep
 
-Run a structured SLURM sweep across agent counts (8 → 32 → 64 → 128 → 256) and step counts (4 → 8 → 16) on both mock and Aitta backends. Record wall time and agent-steps per second at each combination. Produce a results table showing how throughput scales with agent count.
+Status: sweep specs implemented. `configs/scale_sweep_mock.json` covers 15 combinations (5 agent counts × 3 step counts, mock backend). `configs/scale_sweep_aitta.json` covers 5 combinations (5 agent counts at 8 steps, Aitta backend). See `docs/lumi.md` for submission instructions.
 
-This is the most important remaining piece: it gives a concrete, numerical answer to "what does running this on HPC buy you?" and provides evidence that the simulation can operate at meaningful scale.
+**Still needed:** run the sweeps on LUMI and record the results — wall time and agent-steps per second at each agent count. Add a results table to this document once the numbers are in.
 
 ### B. Demo run config and narrative
 
-Add a single curated config (`configs/demo_lumi.json`) designed to be the canonical showcase run: a fixture-backed storm scenario, a representative agent count, and the Aitta backend, sized to complete within a 15-minute SLURM time limit. Add a short paragraph to `docs/lumi.md` explaining what the run demonstrates and pointing to the output artifacts. A stakeholder should be able to clone the repo, submit one `sbatch`, and see a meaningful result.
+Status: complete. `configs/demo_lumi.json` is the canonical showcase run (64 agents, storm fixture, Aitta backend, 6 steps). Submission instructions and output guide are in `docs/lumi.md`.
 
 ## Potential future additions
 

@@ -1,0 +1,16 @@
+{
+  "comment": "Scale characterisation sweep — Aitta backend. 5 combinations: 5 agent counts at fixed 8 steps. Requires AITTA_API_KEY, AITTA_BASE_URL, AITTA_MODEL. Submit with: agentic-sim generate-sweep configs/scale_sweep_aitta.json",
+  "base": "configs/storm_scale.json",
+  "matrix": [
+    {"agent_replicas": 8,   "steps": 8},
+    {"agent_replicas": 32,  "steps": 8},
+    {"agent_replicas": 64,  "steps": 8},
+    {"agent_replicas": 128, "steps": 8},
+    {"agent_replicas": 256, "steps": 8}
+  ],
+  "fixed": {
+    "backend": "aitta",
+    "storage_mode": "sqlite",
+    "max_batch_size": 32
+  }
+}
