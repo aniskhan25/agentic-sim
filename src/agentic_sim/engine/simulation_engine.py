@@ -72,6 +72,7 @@ class SimulationEngine:
                 store=self.store,
             )
             for activation in activations
+            if activation.trigger_event_id in event_by_id
         ]
         timings["context_building_ms"] = _elapsed_ms(started)
 

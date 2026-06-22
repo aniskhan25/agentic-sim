@@ -18,7 +18,7 @@ class StateStoreTests(unittest.TestCase):
             name="Coordinator",
             region="test",
         )
-        event = Event.create(EventType.TIMER_FIRED, source="test")
+        event = Event.create(EventType.MESSAGE_ARRIVED, source="test")
 
         store.agents.put_profile(profile)
         store.agents.put_state(AgentState(agent_id=profile.agent_id))
@@ -58,7 +58,7 @@ class StateStoreTests(unittest.TestCase):
             scheduled_for = datetime(2026, 1, 1, tzinfo=timezone.utc)
             newer = Event(
                 event_id="evt_newer",
-                event_type=EventType.TIMER_FIRED,
+                event_type=EventType.MESSAGE_ARRIVED,
                 created_at=scheduled_for + timedelta(seconds=1),
                 scheduled_for=scheduled_for,
                 source="test",
@@ -66,7 +66,7 @@ class StateStoreTests(unittest.TestCase):
             )
             older = Event(
                 event_id="evt_older",
-                event_type=EventType.TIMER_FIRED,
+                event_type=EventType.MESSAGE_ARRIVED,
                 created_at=scheduled_for,
                 scheduled_for=scheduled_for,
                 source="test",
@@ -87,7 +87,7 @@ class StateStoreTests(unittest.TestCase):
             path = Path(tmpdir) / "state.sqlite"
             environment = StormEnvironment().initialize()
             store = SQLiteStateStore(path, environment=environment)
-            store.events.put(Event.create(EventType.TIMER_FIRED, source="test"))
+            store.events.put(Event.create(EventType.MESSAGE_ARRIVED, source="test"))
             store.close()
 
             fresh = SQLiteStateStore(path, environment=environment)

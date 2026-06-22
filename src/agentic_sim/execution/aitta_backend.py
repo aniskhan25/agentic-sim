@@ -49,7 +49,7 @@ class AittaExecutionBackend:
         self.base_url = base_url or os.environ.get("AITTA_BASE_URL", "")
         self.model_name = model_name or os.environ.get("AITTA_MODEL", "")
         self.timeout_seconds = float(
-            timeout_seconds or os.environ.get("AITTA_REQUEST_TIMEOUT", 120)
+            timeout_seconds if timeout_seconds is not None else os.environ.get("AITTA_REQUEST_TIMEOUT", 120)
         )
         self.max_retries = max(0, max_retries)
         self.max_concurrency = max(1, max_concurrency)
@@ -636,7 +636,7 @@ def _events(request: ExecutionRequest, value: Any) -> list[Event]:
             Event.create(
                 EventType(_required_str(item, "event_type")),
                 source=str(item.get("source") or request.agent_profile.agent_id),
-                target_scope=_optional_dict(item, "target_scope"),
+                target_scope=_optional_dict(item, "target_scope") or {"agent_ids": [str(request.agent_profile.agent_id)]},
                 payload=_optional_dict(item, "payload"),
                 priority=int(item.get("priority", request.triggering_event.priority)),
                 correlation_id=item.get("correlation_id")
