@@ -49,7 +49,6 @@ class ExecutionRequest:
     inbox_messages: list[Message]
     triggering_event: Event
     environment: EnvironmentState
-    step_budget: int = 1
     backend_hint: str = "mock"
 
 

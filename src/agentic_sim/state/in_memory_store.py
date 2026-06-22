@@ -75,11 +75,12 @@ class InMemoryStateStore:
     def count_pending(self) -> int:
         return len(self._events)
 
-    def inbox(self, agent_id: AgentId, limit: int = 10) -> list[Message]:
-        messages = [
-            message for message in self._messages.values() if message.recipient_id == agent_id
-        ]
-        messages.sort(key=lambda message: (-message.priority, message.created_at))
+    def inbox(self, agent_id: AgentId, limit: int = 10, after: str | None = None) -> list[Message]:
+        messages = [m for m in self._messages.values() if m.recipient_id == agent_id]
+        if after and after in self._messages:
+            cursor_time = self._messages[after].created_at
+            messages = [m for m in messages if m.created_at > cursor_time]
+        messages.sort(key=lambda m: (-m.priority, m.created_at))
         return messages[:limit]
 
     def count(self) -> int:

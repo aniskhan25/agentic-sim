@@ -106,8 +106,11 @@ class SupplyChainEnvironment:
         shortage_regions = [
             name for name, value in inventory.items() if int(value) < max(20, demand // 2)
         ]
-        risk_level = "high" if shortage_regions or delayed_shipments >= 12 else "elevated"
-        if demand < 120 and delayed_shipments < 8:
+        if shortage_regions or delayed_shipments >= 12:
+            risk_level = "high"
+        elif demand >= 120 or delayed_shipments >= 8:
+            risk_level = "elevated"
+        else:
             risk_level = "normal"
 
         variables.update(

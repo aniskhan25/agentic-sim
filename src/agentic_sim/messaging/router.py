@@ -22,7 +22,7 @@ class MessageRouter:
                     payload={
                         "message_id": message.message_id,
                         "message_type": message.message_type.value,
-                        "coordinator_id": "agent_coordinator",
+                        "sender_id": str(message.sender_id),
                     },
                     priority=message.priority,
                     correlation_id=message.correlation_id or message.message_id,

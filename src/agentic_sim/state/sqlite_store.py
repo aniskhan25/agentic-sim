@@ -200,38 +200,48 @@ class SQLiteStateStore:
             self.put(item)
 
     def pop_ready(self, now: datetime, limit: int | None = None) -> list[Event]:
-        query = """
-            select event_id, payload from events
-            where scheduled_for <= ?
-            order by priority desc, scheduled_for asc, created_at asc
-        """
-        params: tuple[Any, ...] = (to_iso(now),)
-        if limit is not None:
-            query += " limit ?"
-            params = (to_iso(now), limit)
-        rows = self.conn.execute(query, params).fetchall()
-        events = [_event_from_dict(json.loads(row["payload"])) for row in rows]
-        self.conn.executemany(
-            "delete from events where event_id = ?",
-            [(event.event_id,) for event in events],
-        )
-        self.conn.commit()
+        limit_clause = f" limit {int(limit)}" if limit is not None else ""
+        with self.conn:
+            rows = self.conn.execute(
+                f"select event_id, payload from events "
+                f"where scheduled_for <= ? "
+                f"order by priority desc, scheduled_for asc, created_at asc{limit_clause}",
+                (to_iso(now),),
+            ).fetchall()
+            events = [_event_from_dict(json.loads(row["payload"])) for row in rows]
+            if events:
+                self.conn.executemany(
+                    "delete from events where event_id = ?",
+                    [(event.event_id,) for event in events],
+                )
         return events
 
     def count_pending(self) -> int:
         row = self.conn.execute("select count(*) as count from events").fetchone()
         return int(row["count"])
 
-    def inbox(self, agent_id: AgentId, limit: int = 10) -> list[Message]:
-        rows = self.conn.execute(
-            """
-            select payload from messages
-            where recipient_id = ?
-            order by priority desc, created_at asc
-            limit ?
-            """,
-            (str(agent_id), limit),
-        ).fetchall()
+    def inbox(self, agent_id: AgentId, limit: int = 10, after: str | None = None) -> list[Message]:
+        if after:
+            rows = self.conn.execute(
+                """
+                select payload from messages
+                where recipient_id = ?
+                and created_at > (select created_at from messages where message_id = ?)
+                order by priority desc, created_at asc
+                limit ?
+                """,
+                (str(agent_id), after, limit),
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """
+                select payload from messages
+                where recipient_id = ?
+                order by priority desc, created_at asc
+                limit ?
+                """,
+                (str(agent_id), limit),
+            ).fetchall()
         return [_message_from_dict(json.loads(row["payload"])) for row in rows]
 
     def count(self) -> int:
@@ -305,8 +315,6 @@ def _message_from_dict(data: dict[str, Any]) -> Message:
         priority=int(data.get("priority", 0)),
         created_at=from_iso(data["created_at"]),
         payload=dict(data.get("payload", {})),
-        thread_id=data.get("thread_id"),
-        reply_to=data.get("reply_to"),
         correlation_id=data.get("correlation_id"),
     )
 
