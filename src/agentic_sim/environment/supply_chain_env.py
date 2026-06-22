@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from agentic_sim.models import (
     EnvironmentAction,
@@ -22,6 +23,8 @@ class SupplyChainEnvironment:
         delay_step: int = 4,
         coordinator_id: str = "agent_coordinator",
         operator_ids: list[str] | None = None,
+        initial_variables: dict[str, Any] | None = None,
+        tick_data: list[dict[str, Any]] | None = None,
     ):
         self.regions = regions or ["helsinki", "oulu"]
         self.demand_step = demand_step
@@ -33,20 +36,23 @@ class SupplyChainEnvironment:
             "agent_transport",
             "agent_retailer",
         ]
+        self._initial_variables: dict[str, Any] = initial_variables or {}
+        self._tick_data: list[dict[str, Any]] = tick_data or []
 
     def initialize(self) -> EnvironmentState:
+        init = self._initial_variables
         return EnvironmentState(
             scenario="supply_chain",
             tick=0,
             updated_at=utc_now(),
             variables={
-                "demand": 100,
-                "inventory": {region: 120 for region in self.regions},
-                "delayed_shipments": 0,
-                "transport_capacity": 100,
-                "risk_level": "normal",
+                "demand": int(init.get("demand", 100)),
+                "inventory": dict(init.get("inventory", {region: 120 for region in self.regions})),
+                "delayed_shipments": int(init.get("delayed_shipments", 0)),
+                "transport_capacity": int(init.get("transport_capacity", 100)),
+                "risk_level": str(init.get("risk_level", "normal")),
                 "regions": self.regions,
-                "last_summary": "supply chain initialized",
+                "last_summary": str(init.get("last_summary", "supply chain initialized")),
             },
         )
 
@@ -84,11 +90,18 @@ class SupplyChainEnvironment:
 
     def tick(self, state: EnvironmentState, now: datetime) -> EnvironmentTransitionResult:
         variables = dict(state.variables)
-        demand = int(variables.get("demand", 100)) + self.demand_step
-        delayed_shipments = int(variables.get("delayed_shipments", 0)) + self.delay_step
-        inventory = dict(variables.get("inventory", {}))
-        region = self.regions[(state.tick + 1) % len(self.regions)]
-        inventory[region] = max(0, int(inventory.get(region, 0)) - max(1, demand // 20))
+        tick_entry = self._tick_data[state.tick] if state.tick < len(self._tick_data) else {}
+        demand = int(tick_entry.get("demand", int(variables.get("demand", 100)) + self.demand_step))
+        delayed_shipments = int(
+            tick_entry.get("delayed_shipments", int(variables.get("delayed_shipments", 0)) + self.delay_step)
+        )
+        region = str(tick_entry.get("affected_region", self.regions[(state.tick + 1) % len(self.regions)]))
+        observation = str(tick_entry.get("observation", ""))
+        if "inventory" in tick_entry:
+            inventory = {k: int(v) for k, v in tick_entry["inventory"].items()}
+        else:
+            inventory = dict(variables.get("inventory", {}))
+            inventory[region] = max(0, int(inventory.get(region, 0)) - max(1, demand // 20))
 
         shortage_regions = [
             name for name, value in inventory.items() if int(value) < max(20, demand // 2)
@@ -103,7 +116,7 @@ class SupplyChainEnvironment:
                 "delayed_shipments": delayed_shipments,
                 "inventory": inventory,
                 "risk_level": risk_level,
-                "last_summary": f"demand {demand}, delays {delayed_shipments}, risk {risk_level}",
+                "last_summary": observation or f"demand {demand}, delays {delayed_shipments}, risk {risk_level}",
             }
         )
         next_state = EnvironmentState(

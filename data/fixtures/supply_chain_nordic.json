@@ -1,0 +1,59 @@
+{
+  "meta": {
+    "description": "Synthetic Nordic supply chain disruption: port congestion and storm-driven demand surge",
+    "scenario": "supply_chain",
+    "source": "synthetic",
+    "version": "1"
+  },
+  "initial": {
+    "demand": 95,
+    "inventory": {"helsinki": 130, "oulu": 115},
+    "delayed_shipments": 2,
+    "transport_capacity": 100,
+    "last_summary": "Supply chain baseline: mild pre-season demand, minor port congestion"
+  },
+  "ticks": [
+    {
+      "demand": 110,
+      "delayed_shipments": 6,
+      "inventory": {"helsinki": 122, "oulu": 108},
+      "affected_region": "helsinki",
+      "observation": "Demand uptick due to cold snap; Helsinki port congestion causing 2-day delays on inbound freight"
+    },
+    {
+      "demand": 135,
+      "delayed_shipments": 11,
+      "inventory": {"helsinki": 105, "oulu": 98},
+      "affected_region": "oulu",
+      "observation": "Storm impact: Oulu road closures blocking 3 outbound shipments, e-commerce demand surging"
+    },
+    {
+      "demand": 165,
+      "delayed_shipments": 18,
+      "inventory": {"helsinki": 78, "oulu": 72},
+      "affected_region": "helsinki",
+      "observation": "Critical: Helsinki inventory below safety stock threshold; emergency restocking order raised"
+    },
+    {
+      "demand": 185,
+      "delayed_shipments": 24,
+      "inventory": {"helsinki": 55, "oulu": 60},
+      "affected_region": "oulu",
+      "observation": "Shortage confirmed in both regions; alternate routing via Tampere hub activated, air freight considered"
+    },
+    {
+      "demand": 175,
+      "delayed_shipments": 20,
+      "inventory": {"helsinki": 65, "oulu": 68},
+      "affected_region": "helsinki",
+      "observation": "Emergency restocking partially successful; Helsinki recovering, Oulu still constrained"
+    },
+    {
+      "demand": 150,
+      "delayed_shipments": 13,
+      "inventory": {"helsinki": 82, "oulu": 88},
+      "affected_region": "oulu",
+      "observation": "Demand normalising as weather improves; port congestion easing, delayed shipments clearing"
+    }
+  ]
+}

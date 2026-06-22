@@ -1,0 +1,13 @@
+{
+  "comment": "Supply chain sweep: fixture vs computed, at two agent scales (4 combinations)",
+  "base": "configs/supply_chain_small.json",
+  "matrix": [
+    {"steps": 6, "agent_replicas": 1, "fixture": "data/fixtures/supply_chain_nordic.json"},
+    {"steps": 6, "agent_replicas": 4, "fixture": "data/fixtures/supply_chain_nordic.json"},
+    {"steps": 4, "agent_replicas": 1},
+    {"steps": 4, "agent_replicas": 4}
+  ],
+  "fixed": {
+    "storage_mode": "sqlite"
+  }
+}

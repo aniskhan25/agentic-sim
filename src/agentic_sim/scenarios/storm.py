@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from agentic_sim.environment import StormEnvironment
-from agentic_sim.execution import BatchBuilder, MockExecutionBackend, RuleExecutionBackend
+from agentic_sim.execution import BatchBuilder, create_execution_backend
 from agentic_sim.models import AgentId, AgentProfile
 from agentic_sim.scenarios.common import create_store, string_list
+from agentic_sim.scenarios.fixtures import FixtureLoader
 from agentic_sim.scheduling import FIFOScheduler
 from agentic_sim.state.base import RuntimeStore
 
@@ -40,6 +41,7 @@ def create_storm_engine(
     max_events_per_tick: int = 32,
     agent_replicas: int = 1,
     scenario_parameters: dict[str, Any] | None = None,
+    backend_options: dict[str, Any] | None = None,
 ) -> SimulationEngine:
     scenario_parameters = scenario_parameters or {}
     profiles = _storm_profiles(agent_replicas)
@@ -50,7 +52,11 @@ def create_storm_engine(
         environment=environment.initialize(),
         profiles=profiles,
     )
-    backend = RuleExecutionBackend() if backend_name == "rule" else MockExecutionBackend()
+    backend = create_execution_backend(
+        backend_name,
+        scenario="storm",
+        backend_options=backend_options,
+    )
     from agentic_sim.engine.simulation_engine import SimulationEngine
 
     return SimulationEngine(
@@ -117,8 +123,16 @@ def _storm_environment(
     operator_ids = [
         str(profile.agent_id) for profile in profiles if profile.role in {"hospital", "utility"}
     ]
+    fixture = FixtureLoader.load_if_configured(scenario_parameters)
+    regions = (
+        string_list(scenario_parameters.get("regions"))
+        or (list(fixture.initial.get("regions", [])) if fixture else None)
+        or None
+    )
     return StormEnvironment(
-        regions=string_list(scenario_parameters.get("regions")) or None,
+        regions=regions,
         severity_step=int(scenario_parameters.get("severity_step", 1)),
         operator_ids=operator_ids,
+        initial_variables=fixture.initial if fixture else None,
+        tick_data=fixture.ticks if fixture else None,
     )
