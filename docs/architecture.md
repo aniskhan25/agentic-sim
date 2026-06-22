@@ -12,4 +12,18 @@ The main loop is:
 6. Persist state updates, messages, events, and environment changes.
 7. Write traces and advance the clock.
 
+```mermaid
+flowchart TD
+    A([tick start]) --> B[pop ready events]
+    B --> C{events ready?}
+    C -- no --> Z([idle])
+    C -- yes --> D[plan activations]
+    D --> E[hydrate state + inbox]
+    E --> F[build execution requests]
+    F --> G[execute batch]
+    G --> H[persist state · messages · events · env]
+    H --> I[write traces · advance clock]
+    I --> B
+```
+
 Storage, scheduling, execution, environment dynamics, and observability are independent boundaries. The engine coordinates them but does not own their internal logic.
