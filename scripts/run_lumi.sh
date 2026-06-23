@@ -14,14 +14,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-for _env_file in .env.local .env; do
+for _env_file in "${ROOT_DIR}/.env.local" "${ROOT_DIR}/.env"; do
   if [[ -f "${_env_file}" ]]; then
     set -a; source "${_env_file}"; set +a
   fi
 done
 
-if [[ -d ".venv" ]]; then
-  source ".venv/bin/activate"
+if [[ -d "${ROOT_DIR}/.venv" ]]; then
+  source "${ROOT_DIR}/.venv/bin/activate"
 fi
 
 if [[ "${LOAD_CRAY_PYTHON:-1}" == "1" ]] && command -v module >/dev/null 2>&1; then
