@@ -62,7 +62,7 @@ ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
 
 ### A. Scale characterisation sweep
 
-Status: complete. Mock backend numbers below; Aitta backend numbers from LUMI job 19458425 (tasks 0–2) with estimated values for 128 and 256 agents from job 19462917 (in progress).
+Status: complete. Mock backend numbers below; Aitta backend numbers from LUMI jobs 19458425 (8/32/64 agents) and 19462917 (128/256 agents), all measured.
 
 #### Mock backend — local baseline (macOS, single process)
 
@@ -89,14 +89,14 @@ Peak throughput is around 32–64 agents at 16 steps (~275–299 steps/s). Throu
 |      8 |           169 |       112 |           1.407 |               0.66 |
 |     32 |           645 |       424 |           1.390 |               0.66 |
 |     64 |         1,251 |       840 |           1.359 |               0.67 |
-|    128 |         2,675 |     1,787 |           ~1.34 |              ~0.67 |
-|    256 |         5,349 |     3,571 |           ~1.32 |              ~0.67 |
+|    128 |         2,985 |     2,056 |           1.183 |               0.69 |
+|    256 |         5,308 |     4,615 |           0.984 |               0.87 |
 
-*128- and 256-agent rows: estimated from the linear trend (wall time ∝ LLM calls, throughput ≈ 0.67 act/s). Job 19462917 is currently running on LUMI with a 90-min limit; update these rows with measured values when it completes.*
+Throughput rises from 0.66 to 0.87 act/s as agent count grows. The increase is driven by falling average LLM latency (1.407 s at 8 agents → 0.984 s at 256 agents), not by parallelism — dispatch remains sequential (max_concurrency=1). The latency drop likely reflects shorter prompts for the majority of agents at larger scales: at 256 agents, coordinators make up a small fraction and most activations go to hospitals, utilities, and forecasters whose prompts are smaller. Wall time grows near-linearly with LLM call count, confirming the model-serving round-trip dominates.
 
-Throughput is flat at ~0.67 act/s across all agent counts. The ceiling is set by the average LLM latency (1/1.4 s ≈ 0.71 act/s with sequential dispatch). Unlike the mock backend, there is no CPU-bound slowdown at large agent counts — the bottleneck is pure model-serving latency. Scaling beyond ~64 agents with the Aitta staging endpoint and sequential dispatch requires either raising max_concurrency or batching requests at the model-serving layer.
+Unlike the mock backend (which peaks at 32–64 agents then falls due to CPU saturation), Aitta throughput is non-decreasing across the 8–256 range tested.
 
-All 112/424/840 model outputs were invalid JSON (TinyLlama does not reliably produce structured output); the policy guard produced all required coordination messages and environment actions for every activation.
+All model outputs were invalid JSON (TinyLlama does not reliably produce structured output); the policy guard produced all required coordination messages and environment actions for every activation across all 7,647 total LLM calls.
 
 ### B. Demo run config and narrative
 
