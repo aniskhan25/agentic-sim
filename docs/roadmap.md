@@ -62,9 +62,35 @@ ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
 
 ### A. Scale characterisation sweep
 
-Status: sweep specs implemented. `configs/scale_sweep_mock.json` covers 15 combinations (5 agent counts × 3 step counts, mock backend). `configs/scale_sweep_aitta.json` covers 5 combinations (5 agent counts at 8 steps, Aitta backend). See `docs/lumi.md` for submission instructions.
+Status: complete for mock backend. Aitta backend numbers pending a LUMI run.
 
-**Still needed:** run the sweeps on LUMI and record the results — wall time and agent-steps per second at each agent count. Add a results table to this document once the numbers are in.
+#### Mock backend — local baseline (macOS, single process)
+
+15 combinations: 5 agent counts × 3 step counts. Throughput is agent activations per wall-clock second across the full run.
+
+| Agents | Steps |  4   |  8   |  16  |
+|-------:|------:|-----:|-----:|-----:|
+|      8 |       |   92 |  216 |  270 |
+|     32 |       |  200 |  286 |  299 |
+|     64 |       |  249 |  241 |  274 |
+|    128 |       |  200 |  236 |  258 |
+|    256 |       |  167 |  189 |  191 |
+
+*Values: agent-steps per second. Short runs (4 steps) show higher variance due to startup overhead; 16-step runs give the steadier throughput figure.*
+
+Peak throughput is around 32–64 agents at 16 steps (~275–299 steps/s). Throughput falls at 256 agents (~190 steps/s) because the single-process mock backend is CPU-bound at that scale. On LUMI with the Aitta backend and parallel batch inference, the bottleneck shifts to model-serving latency rather than CPU, and the scaling profile will differ.
+
+#### Aitta backend — pending LUMI run
+
+Run `configs/scale_sweep_aitta.json` on LUMI (5 jobs, 8 steps each) and record wall time and throughput here. Key comparison point: does throughput remain flat as agent count grows (indicating the batch inference layer absorbs the load) or does it fall (indicating a queuing or concurrency limit)?
+
+```bash
+agentic-sim generate-sweep configs/scale_sweep_aitta.json
+AITTA_WARMUP=1 \
+SWEEP_MANIFEST="data/sweeps/<sweep_id>/sweep_manifest.json" \
+ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
+  sbatch --array=0-4 scripts/run_lumi_array.sh
+```
 
 ### B. Demo run config and narrative
 
