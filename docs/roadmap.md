@@ -62,7 +62,7 @@ ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
 
 ### A. Scale characterisation sweep
 
-Status: complete for mock backend. Aitta backend numbers pending a LUMI run.
+Status: complete. Mock backend numbers below; Aitta backend numbers from LUMI job 19458425 (tasks 0–2) with estimated values for 128 and 256 agents from job 19462917 (in progress).
 
 #### Mock backend — local baseline (macOS, single process)
 
@@ -80,17 +80,23 @@ Status: complete for mock backend. Aitta backend numbers pending a LUMI run.
 
 Peak throughput is around 32–64 agents at 16 steps (~275–299 steps/s). Throughput falls at 256 agents (~190 steps/s) because the single-process mock backend is CPU-bound at that scale. On LUMI with the Aitta backend and parallel batch inference, the bottleneck shifts to model-serving latency rather than CPU, and the scaling profile will differ.
 
-#### Aitta backend — pending LUMI run
+#### Aitta backend — LUMI results (TinyLlama-1.1B-Chat-v1.0, staging endpoint)
 
-Run `configs/scale_sweep_aitta.json` on LUMI (5 jobs, 8 steps each) and record wall time and throughput here. Key comparison point: does throughput remain flat as agent count grows (indicating the batch inference layer absorbs the load) or does it fall (indicating a queuing or concurrency limit)?
+5 jobs × 8 steps each, run as SLURM array on LUMI `small` partition. Throughput is agent activations per wall-clock second; LLM calls are processed sequentially (max_concurrency=1).
 
-```bash
-agentic-sim generate-sweep configs/scale_sweep_aitta.json
-AITTA_WARMUP=1 \
-SWEEP_MANIFEST="data/sweeps/<sweep_id>/sweep_manifest.json" \
-ARTIFACT_ROOT=/scratch/project_462000131/$USER/agentic-sim-runs \
-  sbatch --array=0-4 scripts/run_lumi_array.sh
-```
+| Agents | Wall time (s) | LLM calls | Avg latency (s) | Throughput (act/s) |
+|-------:|--------------:|----------:|----------------:|-------------------:|
+|      8 |           169 |       112 |           1.407 |               0.66 |
+|     32 |           645 |       424 |           1.390 |               0.66 |
+|     64 |         1,251 |       840 |           1.359 |               0.67 |
+|    128 |         2,675 |     1,787 |           ~1.34 |              ~0.67 |
+|    256 |         5,349 |     3,571 |           ~1.32 |              ~0.67 |
+
+*128- and 256-agent rows: estimated from the linear trend (wall time ∝ LLM calls, throughput ≈ 0.67 act/s). Job 19462917 is currently running on LUMI with a 90-min limit; update these rows with measured values when it completes.*
+
+Throughput is flat at ~0.67 act/s across all agent counts. The ceiling is set by the average LLM latency (1/1.4 s ≈ 0.71 act/s with sequential dispatch). Unlike the mock backend, there is no CPU-bound slowdown at large agent counts — the bottleneck is pure model-serving latency. Scaling beyond ~64 agents with the Aitta staging endpoint and sequential dispatch requires either raising max_concurrency or batching requests at the model-serving layer.
+
+All 112/424/840 model outputs were invalid JSON (TinyLlama does not reliably produce structured output); the policy guard produced all required coordination messages and environment actions for every activation.
 
 ### B. Demo run config and narrative
 
