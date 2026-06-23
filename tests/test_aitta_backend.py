@@ -97,7 +97,7 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(calls[0]["url"], "https://aitta.example/openai/v1/chat/completions")
         self.assertEqual(calls[0]["headers"]["Authorization"], "Bearer secret")
         self.assertEqual(calls[0]["payload"]["model"], "demo/model")
-        self.assertEqual(calls[0]["payload"]["response_format"], {"type": "json_object"})
+        self.assertNotIn("response_format", calls[0]["payload"])
         prompt = json.loads(calls[0]["payload"]["messages"][1]["content"])
         self.assertEqual(prompt["role_policy"]["role"], "coordinator")
         self.assertEqual(prompt["role_policy"]["requirements"][0]["message_type"], "status_request")
@@ -188,8 +188,8 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(result.metadata["retry_count"], 2)
 
 
-    def test_request_prompt_includes_environment_specific_response_shape(self):
-        """response_shape sent to the model reflects actual environment values."""
+    def test_request_prompt_contains_agent_and_role_policy(self):
+        """Prompt includes agent context and role_policy; response_shape is omitted to save tokens."""
         captured = []
 
         def transport(url, headers, payload, timeout):
@@ -205,34 +205,16 @@ class AittaBackendTests(unittest.TestCase):
         backend.run_batch([_request()])
 
         user_content = json.loads(captured[0]["messages"][1]["content"])
-        shape = user_content["response_shape"]
-        # Shape should reference actual environment severity (4), not a generic placeholder
-        shape_str = json.dumps(shape)
-        self.assertIn("4", shape_str)
-        # Shape should name the coordinator's agent_id as a recipient
-        self.assertIn("agent_hospital", shape_str)
-
-    def test_role_policy_requirements_include_payload_guidance(self):
-        """Requirements in role_policy carry payload_guidance to steer model output content."""
-        captured = []
-
-        def transport(url, headers, payload, timeout):
-            captured.append(payload)
-            return {"choices": [{"message": {"content": "{}"}}]}
-
-        backend = AittaExecutionBackend(
-            api_key="secret",
-            base_url="https://aitta.example/openai/v1/",
-            model_name="demo/model",
-            transport=transport,
-        )
-        backend.run_batch([_request()])
-
-        user_content = json.loads(captured[0]["messages"][1]["content"])
+        # response_shape was removed to reduce prompt size for small-context models
+        self.assertNotIn("response_shape", user_content)
+        # role and environment are present
+        self.assertEqual(user_content["agent"]["role"], "coordinator")
+        self.assertEqual(user_content["environment"]["scenario"], "storm")
+        # operator appears in example_operator_ids
         requirements = user_content["role_policy"]["requirements"]
         self.assertTrue(
-            any("payload_guidance" in req for req in requirements),
-            "At least one requirement should carry payload_guidance",
+            any("agent_hospital" in req.get("example_operator_ids", []) for req in requirements),
+            "example_operator_ids should reference agent_hospital",
         )
 
 
