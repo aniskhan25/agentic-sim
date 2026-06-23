@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
-#SBATCH --time=00:30:00
+#SBATCH --time=01:30:00
 #SBATCH --array=0-3
 #SBATCH --output=/scratch/project_462000131/anisrahm/agentic-sim-runs/logs/%x-%A_%a.out
 
