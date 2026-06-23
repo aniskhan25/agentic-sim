@@ -38,7 +38,7 @@ class AittaExecutionBackend:
         base_url: str | None = None,
         model_name: str | None = None,
         timeout_seconds: float | None = None,
-        max_retries: int = 0,
+        max_retries: int = 3,
         max_concurrency: int = 1,
         temperature: float = 0.2,
         top_p: float = 0.95,
@@ -103,6 +103,8 @@ class AittaExecutionBackend:
                 return self.transport(url, headers, payload, self.timeout_seconds), attempt
             except Exception as exc:
                 last_error = exc
+                if attempt < self.max_retries:
+                    time.sleep(2 ** attempt)
         raise RuntimeError(
             f"Aitta request failed after {self.max_retries + 1} attempt(s): {last_error}"
         ) from last_error
@@ -116,8 +118,7 @@ class AittaExecutionBackend:
             ],
             "temperature": self.temperature,
             "top_p": self.top_p,
-            "max_completion_tokens": self.max_completion_tokens,
-            "response_format": {"type": "json_object"},
+            "max_tokens": self.max_completion_tokens,
             "n": 1,
         }
 
