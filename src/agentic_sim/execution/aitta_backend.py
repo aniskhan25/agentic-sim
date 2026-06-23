@@ -235,22 +235,42 @@ def _system_prompt() -> str:
 
 
 def _request_prompt(request: ExecutionRequest) -> str:
+    profile = request.agent_profile
     payload = {
-        "agent_profile": to_jsonable(request.agent_profile),
-        "agent_state": to_jsonable(request.agent_state),
-        "triggering_event": to_jsonable(request.triggering_event),
-        "environment": to_jsonable(request.environment),
-        "inbox_messages": [to_jsonable(message) for message in request.inbox_messages],
-        "allowed_message_types": [item.value for item in MessageType],
-        "allowed_event_types": [item.value for item in EventType],
+        "agent": {
+            "agent_id": str(profile.agent_id),
+            "role": profile.role,
+            "region": profile.region,
+        },
+        "agent_state": {
+            "status": request.agent_state.status.value,
+            "current_goal": request.agent_state.current_goal,
+            "working_memory": request.agent_state.working_memory,
+        },
+        "triggering_event": {
+            "event_type": request.triggering_event.event_type.value,
+            "priority": request.triggering_event.priority,
+            "payload": request.triggering_event.payload,
+        },
+        "environment": {
+            "scenario": request.environment.scenario,
+            "tick": request.environment.tick,
+            "variables": request.environment.variables,
+        },
+        "inbox_messages": [
+            {
+                "sender_id": str(m.sender_id),
+                "message_type": m.message_type.value,
+                "payload": m.payload,
+            }
+            for m in request.inbox_messages
+        ],
         "role_policy": _role_policy(request),
-        "response_shape": _response_shape(request),
     }
     return json.dumps(payload, ensure_ascii=True, sort_keys=True)
 
 
-def _response_shape(request: ExecutionRequest) -> dict[str, Any]:
-    """Return a role- and scenario-specific example showing the expected output shape."""
+def _response_shape_UNUSED(request: ExecutionRequest) -> dict[str, Any]:
     role = request.agent_profile.role
     scenario = request.environment.scenario
     variables = request.environment.variables
@@ -455,28 +475,21 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
         "allowed_environment_actions": _allowed_environment_actions(scenario, role),
     }
     if role == "coordinator":
+        all_operator_ids = list(event_payload.get("operator_ids", []))
         policy["requirements"].append(
             {
                 "type": "outgoing_messages",
-                "instruction": "Send a status_request to every operator_id in the triggering event payload.",
-                "operator_ids": list(event_payload.get("operator_ids", [])),
+                "instruction": "Send status_request to each operator_id listed in the triggering event payload.",
+                "example_operator_ids": all_operator_ids[:3],
+                "total_operators": len(all_operator_ids),
                 "message_type": MessageType.STATUS_REQUEST.value,
-                "payload_guidance": (
-                    "Include your agent_id as coordinator_id, the current severity or risk_level "
-                    "from environment variables, affected regions or demand, and a concise summary "
-                    "of the event so operators have context for their response."
-                ),
             }
         )
         policy["requirements"].append(
             {
                 "type": "environment_action",
-                "instruction": "Update the environment summary with the coordinator assessment.",
                 "action_type": "update_summary",
-                "payload_guidance": (
-                    "Write a one-sentence summary naming the event type, current severity or risk level, "
-                    "affected scope, and which operators you have contacted."
-                ),
+                "instruction": "Write a one-sentence summary of the event and which operators were contacted.",
             }
         )
     elif role in {"hospital", "utility"}:
@@ -484,29 +497,17 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
         policy["requirements"].append(
             {
                 "type": "outgoing_message",
-                "instruction": "Send one status_update to the coordinator_id from the triggering event payload.",
                 "recipient_id": event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator"),
                 "message_type": MessageType.STATUS_UPDATE.value,
-                "status_rule": "Use strained when severity is 3 or higher; otherwise normal.",
-                "severity": severity,
-                "payload_guidance": (
-                    f"Set status to {'strained' if severity >= 3 else 'normal'}. "
-                    "Include your role, region, current severity, and a brief note on operational impact "
-                    f"(e.g. capacity constraints for hospital, service disruption for utility)."
-                ),
+                "status": "strained" if severity >= 3 else "normal",
             }
         )
     elif role == "forecaster":
         policy["requirements"].append(
             {
                 "type": "environment_action",
-                "instruction": "Update the environment summary with a concise forecast assessment.",
                 "action_type": "update_summary",
-                "payload_guidance": (
-                    "Write a summary that names the current severity, affected regions, trend direction "
-                    "(intensifying / stable / weakening), and estimated time to peak impact. "
-                    "Base it on environment variables."
-                ),
+                "instruction": "Write a one-sentence forecast: severity, regions, trend.",
             }
         )
     elif role in {"supplier", "warehouse", "transport", "retailer"}:
@@ -514,17 +515,9 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
         policy["requirements"].append(
             {
                 "type": "outgoing_message",
-                "instruction": "Send one status_update to the coordinator_id from the triggering event payload.",
                 "recipient_id": event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator"),
                 "message_type": MessageType.STATUS_UPDATE.value,
-                "risk_level": risk_level,
-                "payload_guidance": (
-                    f"Set status to {'strained' if risk_level != 'normal' else 'normal'}. "
-                    "Include your role, region, current risk_level, demand value, and a brief note "
-                    "on operational impact relevant to your role "
-                    "(e.g. inventory pressure for supplier, routing delays for transport, "
-                    "stock prioritisation for warehouse, demand spike for retailer)."
-                ),
+                "status": "strained" if risk_level != "normal" else "normal",
             }
         )
         if risk_level != "normal":
@@ -534,12 +527,7 @@ def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
                     {
                         "type": "environment_action",
                         "action_type": allowed[0],
-                        "instruction": "Propose one mitigation action relevant to your role.",
-                        "payload_guidance": (
-                            "Propose a concrete mitigation: specify a numeric delta for inventory or "
-                            "capacity adjustments, or write a one-sentence summary for update_summary. "
-                            "Use region from your agent_profile."
-                        ),
+                        "instruction": "Propose one concrete mitigation action.",
                     }
                 )
     return policy
@@ -689,7 +677,9 @@ def _required_messages(request: ExecutionRequest, policy: dict[str, Any]) -> lis
     for req in policy.get("requirements", []):
         req_type = req.get("type", "")
         if req_type == "outgoing_messages":
-            for agent_id in req.get("operator_ids", []):
+            # Read from the triggering event payload (authoritative), not the policy summary
+            all_ids = list(request.triggering_event.payload.get("operator_ids", []))
+            for agent_id in all_ids:
                 messages.append(Message.create(
                     sender_id=request.agent_profile.agent_id,
                     recipient_id=AgentId(agent_id),
