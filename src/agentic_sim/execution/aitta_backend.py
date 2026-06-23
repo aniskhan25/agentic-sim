@@ -250,7 +250,7 @@ def _request_prompt(request: ExecutionRequest) -> str:
         "triggering_event": {
             "event_type": request.triggering_event.event_type.value,
             "priority": request.triggering_event.priority,
-            "payload": request.triggering_event.payload,
+            "payload": _slim_payload(request.triggering_event.payload),
         },
         "environment": {
             "scenario": request.environment.scenario,
@@ -268,6 +268,18 @@ def _request_prompt(request: ExecutionRequest) -> str:
         "role_policy": _role_policy(request),
     }
     return json.dumps(payload, ensure_ascii=True, sort_keys=True)
+
+
+def _slim_payload(payload: dict[str, Any], max_list: int = 3) -> dict[str, Any]:
+    """Return a copy of payload with long lists truncated to max_list items."""
+    result = {}
+    for k, v in payload.items():
+        if isinstance(v, list) and len(v) > max_list:
+            result[k] = v[:max_list]
+            result[f"{k}_total"] = len(v)
+        else:
+            result[k] = v
+    return result
 
 
 def _response_shape_UNUSED(request: ExecutionRequest) -> dict[str, Any]:
