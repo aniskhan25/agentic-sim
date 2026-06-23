@@ -12,7 +12,13 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# SLURM_SUBMIT_DIR is always the directory from which sbatch was invoked;
+# fall back to BASH_SOURCE for local/interactive runs.
+if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+  ROOT_DIR="${SLURM_SUBMIT_DIR}"
+else
+  ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
 cd "${ROOT_DIR}"
 
 for _env_file in "${ROOT_DIR}/.env.local" "${ROOT_DIR}/.env"; do

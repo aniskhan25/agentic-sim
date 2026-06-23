@@ -11,7 +11,11 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+  ROOT_DIR="${SLURM_SUBMIT_DIR}"
+else
+  ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
 cd "${ROOT_DIR}"
 
 for _env_file in "${ROOT_DIR}/.env.local" "${ROOT_DIR}/.env"; do
