@@ -56,7 +56,7 @@ class AittaExecutionBackend:
         self.temperature = temperature
         self.top_p = top_p
         self.max_completion_tokens = int(
-            max_completion_tokens or os.environ.get("AITTA_MAX_COMPLETION_TOKENS", 1024)
+            max_completion_tokens or os.environ.get("AITTA_MAX_COMPLETION_TOKENS", 256)
         )
         self.transport = transport or _post_json
 
@@ -118,7 +118,7 @@ class AittaExecutionBackend:
             ],
             "temperature": self.temperature,
             "top_p": self.top_p,
-            "max_tokens": self.max_completion_tokens,
+            "max_completion_tokens": self.max_completion_tokens,
             "n": 1,
         }
 
