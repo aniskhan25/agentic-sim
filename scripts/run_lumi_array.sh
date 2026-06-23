@@ -53,6 +53,10 @@ if (( TASK_ID < 0 || TASK_ID >= ${#CONFIGS[@]} )); then
 fi
 
 CONFIG="${CONFIG:-${CONFIGS[$TASK_ID]}}"
+# Resolve relative paths against ROOT_DIR so the CLI always gets an absolute path
+if [[ "${CONFIG}" != /* ]]; then
+  CONFIG="${ROOT_DIR}/${CONFIG}"
+fi
 CONFIG_NAME="$(basename "${CONFIG}" .json)"
 
 if [[ -z "${ARTIFACT_ROOT:-}" ]]; then
