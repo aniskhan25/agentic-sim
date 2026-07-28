@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from agentic_sim.execution import role_policy
+from agentic_sim.execution.capabilities import ProviderCapabilities
 from agentic_sim.models import (
     AgentId,
     AgentState,
@@ -17,10 +18,13 @@ from agentic_sim.models import (
     EnvironmentAction,
     Event,
     EventType,
+    ExecutionReceipt,
     ExecutionRequest,
     ExecutionResult,
     Message,
     MessageType,
+    Proposal,
+    ValidationResult,
 )
 from agentic_sim.utils.serialization import to_jsonable
 from agentic_sim.utils.time import utc_now
@@ -71,6 +75,18 @@ class AittaExecutionBackend:
         if not self.model_name:
             raise ValueError("AITTA_MODEL is required for the Aitta backend")
 
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            supports_concurrency=self.max_concurrency > 1,
+            supports_server_batching=False,
+            supports_structured_output=True,
+            supports_prefix_caching=False,
+            max_context_tokens=self.max_completion_tokens,
+            observable_token_usage=True,
+            observable_energy=False,
+        )
+
     def run_batch(self, requests: list[ExecutionRequest]) -> list[ExecutionResult]:
         if self.max_concurrency == 1 or len(requests) <= 1:
             return [self._run_one(request) for request in requests]
@@ -102,6 +118,7 @@ class AittaExecutionBackend:
             latency_seconds,
             retry_count,
             json_repair_attempts=json_repair_attempts,
+            raw_content=content,
         )
 
     def _try_parse(self, content: str) -> dict[str, Any]:
@@ -170,6 +187,7 @@ class AittaExecutionBackend:
         latency_seconds: float,
         retry_count: int = 0,
         json_repair_attempts: int = 0,
+        raw_content: str = "",
     ) -> ExecutionResult:
         state = _updated_state(request, proposal)
         metadata = {
@@ -203,6 +221,50 @@ class AittaExecutionBackend:
 
         final_violations = role_policy.semantic_violations(request, messages, actions, policy)
         metadata["useful_step"] = not final_violations
+
+        proposal_obj = Proposal(
+            raw_content=raw_content,
+            current_goal=proposal.get("current_goal"),
+            working_memory=_optional_dict(proposal, "working_memory"),
+            outgoing_messages=proposal.get("outgoing_messages") or [],
+            environment_actions=proposal.get("environment_actions") or [],
+            emitted_events=proposal.get("emitted_events") or [],
+            metadata=_optional_dict(proposal, "metadata"),
+            is_valid=not _is_invalid(proposal),
+            parse_error=proposal.get("metadata", {}).get("model_output_error"),
+        )
+
+        validation_result = ValidationResult(
+            semantic_valid=metadata["semantic_valid"],
+            model_output_invalid=_is_invalid(proposal),
+            model_output_error=proposal.get("metadata", {}).get("model_output_error"),
+            json_repair_attempts=json_repair_attempts,
+            must_not_violations=metadata["must_not_violations"],
+            violation_reasons=final_violations,
+            policy_guard_added_messages=added_messages,
+            policy_guard_added_actions=added_actions,
+            autonomy_rate=metadata["autonomy_rate"],
+            useful_step=metadata["useful_step"],
+        )
+        metadata["validation_result"] = to_jsonable(validation_result)
+
+        receipt = ExecutionReceipt(
+            activation_id=request.activation.activation_id,
+            attempt_number=request.activation.attempt_number,
+            provider=self.name,
+            model=self.model_name,
+            total_latency_seconds=round(latency_seconds, 3),
+            token_usage=response.get("usage"),
+            schema_valid=not _is_invalid(proposal),
+            semantic_valid=metadata["semantic_valid"],
+            repair_attempts=json_repair_attempts,
+            policy_completion_applied=bool(added_messages or added_actions),
+            fallback_used=_is_invalid(proposal),
+            commit_status="proposed",
+            error_reason=proposal.get("metadata", {}).get("model_output_error"),
+        )
+        metadata["execution_receipt"] = to_jsonable(receipt)
+
         return ExecutionResult(
             agent_id=request.agent_profile.agent_id,
             updated_state=state,
@@ -210,6 +272,7 @@ class AittaExecutionBackend:
             environment_actions=actions,
             emitted_events=_events(request, proposal.get("emitted_events", [])),
             metadata=metadata,
+            proposal=proposal_obj,
         )
 
 

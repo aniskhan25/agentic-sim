@@ -8,6 +8,7 @@ from agentic_sim.models.agent import AgentId, AgentProfile, AgentState
 from agentic_sim.models.environment import EnvironmentAction, EnvironmentState
 from agentic_sim.models.event import Event
 from agentic_sim.models.message import Message
+from agentic_sim.models.proposal import Proposal
 from agentic_sim.utils.ids import new_id
 from agentic_sim.utils.time import utc_now
 
@@ -20,6 +21,7 @@ class Activation:
     activation_reason: str
     priority: int
     ready_at: datetime
+    attempt_number: int = 0
 
     @classmethod
     def create(
@@ -30,6 +32,7 @@ class Activation:
         activation_reason: str,
         priority: int,
         ready_at: datetime | None = None,
+        attempt_number: int = 0,
     ) -> "Activation":
         return cls(
             activation_id=new_id("act"),
@@ -38,6 +41,7 @@ class Activation:
             activation_reason=activation_reason,
             priority=priority,
             ready_at=ready_at or utc_now(),
+            attempt_number=attempt_number,
         )
 
 
@@ -60,6 +64,7 @@ class ExecutionResult:
     environment_actions: list[EnvironmentAction] = field(default_factory=list)
     emitted_events: list[Event] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    proposal: Proposal | None = None
 
 
 @dataclass(slots=True)

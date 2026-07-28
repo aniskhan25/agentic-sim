@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agentic_sim.execution.capabilities import ProviderCapabilities
 from agentic_sim.models import (
     AgentId,
     AgentState,
@@ -17,6 +18,15 @@ class MockExecutionBackend:
     """Deterministic backend for tests and local smoke runs."""
 
     name = "mock"
+    capabilities = ProviderCapabilities(
+        supports_concurrency=True,
+        supports_server_batching=False,
+        supports_structured_output=True,
+        supports_prefix_caching=False,
+        max_context_tokens=0,
+        observable_token_usage=False,
+        observable_energy=False,
+    )
 
     def run_batch(self, requests: list[ExecutionRequest]) -> list[ExecutionResult]:
         return [self._run_one(request) for request in requests]

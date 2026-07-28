@@ -529,6 +529,131 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(result.metadata["policy_guard_added_actions"], 1)
         self.assertEqual(result.metadata["autonomy_rate"], 0.5)
 
+    def test_validation_result_and_receipt_match_flat_metadata_for_autonomous_proposal(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_hospital",
+                                            "message_type": "status_request",
+                                            "payload": {"severity": 4},
+                                        }
+                                    ],
+                                    "environment_actions": [
+                                        {"action_type": "update_summary", "payload": {"summary": "ok"}}
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        vr = result.metadata["validation_result"]
+        self.assertEqual(vr["semantic_valid"], result.metadata["semantic_valid"])
+        self.assertEqual(vr["autonomy_rate"], result.metadata["autonomy_rate"])
+        self.assertEqual(vr["useful_step"], result.metadata["useful_step"])
+        self.assertEqual(vr["violation_reasons"], [])
+        self.assertFalse(vr["model_output_invalid"])
+
+    def test_validation_result_counts_must_not_violation_but_final_reasons_are_clean(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_coordinator",
+                                            "message_type": "status_request",
+                                            "payload": {},
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        vr = result.metadata["validation_result"]
+        # the violation was caught and stripped by the guard, so the count reflects
+        # it but the FINAL reasons list is clean -- that's what "useful_step" reports.
+        self.assertEqual(vr["must_not_violations"], 1)
+        self.assertEqual(vr["violation_reasons"], [])
+        self.assertTrue(vr["useful_step"])
+
+    def test_execution_receipt_fields_and_honest_unknowns(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+        request = _request()
+
+        result = backend.run_batch([request])[0]
+
+        receipt = result.metadata["execution_receipt"]
+        self.assertEqual(receipt["activation_id"], request.activation.activation_id)
+        self.assertEqual(receipt["attempt_number"], 0)
+        self.assertEqual(receipt["provider"], "aitta")
+        self.assertEqual(receipt["model"], "demo/model")
+        self.assertEqual(receipt["commit_status"], "proposed")
+        # unmeasurable fields must stay None, never a fake placeholder
+        self.assertIsNone(receipt["state_version_read"])
+        self.assertIsNone(receipt["commit_version_written"])
+        self.assertIsNone(receipt["request_hash"])
+        self.assertIsNone(receipt["dispatch_seconds"])
+        self.assertIsNone(receipt["accelerator"])
+
+    def test_proposal_raw_content_matches_transport_response(self):
+        raw = '{"current_goal": "coordinate"}'
+
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": raw}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.proposal.raw_content, raw)
+        self.assertTrue(result.proposal.is_valid)
+        self.assertEqual(result.proposal.current_goal, "coordinate")
+
     def test_request_prompt_contains_agent_and_role_policy(self):
         """Prompt includes agent context and role_policy; response_shape is omitted to save tokens."""
         captured = []

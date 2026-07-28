@@ -12,7 +12,11 @@ from agentic_sim.models.execution import (
     SimulationTickResult,
 )
 from agentic_sim.models.message import Message, MessageType
+from agentic_sim.models.platform_manifest import PlatformManifest
+from agentic_sim.models.proposal import Proposal
+from agentic_sim.models.receipt import ExecutionReceipt
 from agentic_sim.models.trace import TraceRecord
+from agentic_sim.models.validation import ValidationResult
 
 __all__ = [
     "Activation",
@@ -25,10 +29,14 @@ __all__ = [
     "EnvironmentTransitionResult",
     "Event",
     "EventType",
+    "ExecutionReceipt",
     "ExecutionRequest",
     "ExecutionResult",
     "Message",
     "MessageType",
+    "PlatformManifest",
+    "Proposal",
     "SimulationTickResult",
     "TraceRecord",
+    "ValidationResult",
 ]
