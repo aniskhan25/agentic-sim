@@ -22,6 +22,7 @@ def create_execution_backend(
             model_name=options.get("aitta_model"),
             timeout_seconds=options.get("aitta_timeout"),
             max_retries=int(options.get("aitta_max_retries", 3)),
+            max_json_repair_attempts=int(options.get("aitta_max_json_repair_attempts", 1)),
             max_concurrency=int(options.get("aitta_max_concurrency", 1)),
             temperature=float(options.get("aitta_temperature", 0.2)),
             top_p=float(options.get("aitta_top_p", 0.95)),

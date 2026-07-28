@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.request
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from agentic_sim.execution import role_policy
 from agentic_sim.models import (
     AgentId,
     AgentState,
@@ -39,6 +41,7 @@ class AittaExecutionBackend:
         model_name: str | None = None,
         timeout_seconds: float | None = None,
         max_retries: int = 3,
+        max_json_repair_attempts: int = 1,
         max_concurrency: int = 1,
         temperature: float = 0.2,
         top_p: float = 0.95,
@@ -52,6 +55,7 @@ class AittaExecutionBackend:
             timeout_seconds if timeout_seconds is not None else os.environ.get("AITTA_REQUEST_TIMEOUT", 120)
         )
         self.max_retries = max(0, max_retries)
+        self.max_json_repair_attempts = max(0, max_json_repair_attempts)
         self.max_concurrency = max(1, max_concurrency)
         self.temperature = temperature
         self.top_p = top_p
@@ -78,18 +82,54 @@ class AittaExecutionBackend:
         payload = self._request_payload(request)
         started = time.perf_counter()
         response, retry_count = self._send(payload)
-        latency_seconds = time.perf_counter() - started
         content = _first_choice_text(response)
+        proposal = self._try_parse(content)
+        json_repair_attempts = 0
+        attempt = 0
+        while _is_invalid(proposal) and attempt < self.max_json_repair_attempts:
+            attempt += 1
+            payload = self._repair_payload(payload, content, proposal)
+            response, extra_retries = self._send(payload)
+            retry_count += extra_retries
+            content = _first_choice_text(response)
+            proposal = self._try_parse(content)
+            json_repair_attempts = attempt
+        latency_seconds = time.perf_counter() - started
+        return self._result_from_proposal(
+            request,
+            proposal,
+            response,
+            latency_seconds,
+            retry_count,
+            json_repair_attempts=json_repair_attempts,
+        )
+
+    def _try_parse(self, content: str) -> dict[str, Any]:
         try:
-            proposal = _json_object(content)
+            return _json_object(content)
         except (json.JSONDecodeError, ValueError) as exc:
-            proposal = {
+            return {
                 "metadata": {
                     "model_output_invalid": True,
                     "model_output_error": str(exc),
                 }
             }
-        return self._result_from_proposal(request, proposal, response, latency_seconds, retry_count)
+
+    def _repair_payload(
+        self, payload: dict[str, Any], bad_content: str, proposal: dict[str, Any]
+    ) -> dict[str, Any]:
+        error = proposal["metadata"]["model_output_error"]
+        messages = list(payload["messages"]) + [
+            {"role": "assistant", "content": bad_content},
+            {
+                "role": "user",
+                "content": (
+                    f"Your previous response was not valid JSON: {error}. "
+                    "Return corrected JSON only, with no markdown or commentary."
+                ),
+            },
+        ]
+        return {**payload, "messages": messages}
 
     def _send(self, payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         url = self.base_url.rstrip("/") + "/chat/completions"
@@ -129,6 +169,7 @@ class AittaExecutionBackend:
         response: dict[str, Any],
         latency_seconds: float,
         retry_count: int = 0,
+        json_repair_attempts: int = 0,
     ) -> ExecutionResult:
         state = _updated_state(request, proposal)
         metadata = {
@@ -140,13 +181,28 @@ class AittaExecutionBackend:
             "usage": response.get("usage"),
         }
         metadata.update(_optional_dict(proposal, "metadata"))
+        metadata["json_repair_attempts"] = json_repair_attempts
         messages = _messages(request, proposal.get("outgoing_messages", []))
         actions = _environment_actions(proposal.get("environment_actions", []))
-        policy = _role_policy(request)
-        messages, added_messages = _ensure_required_messages(request, messages, policy)
-        actions, added_actions = _ensure_required_actions(request, actions, policy)
+        policy = role_policy.build_role_policy(request)
+
+        raw_violations = role_policy.semantic_violations(request, messages, actions, policy)
+        metadata["semantic_valid"] = not _is_invalid(proposal) and not raw_violations
+
+        messages, actions, must_not_violations = role_policy.enforce_must_not(request, messages, actions, policy)
+        metadata["must_not_violations"] = must_not_violations
+        kept_count = len(messages) + len(actions)
+
+        messages, added_messages = role_policy.ensure_required_messages(request, messages, policy)
+        actions, added_actions = role_policy.ensure_required_actions(request, actions, policy)
         metadata["policy_guard_added_messages"] = added_messages
         metadata["policy_guard_added_actions"] = added_actions
+
+        total_final = kept_count + added_messages + added_actions
+        metadata["autonomy_rate"] = round(kept_count / total_final, 6) if total_final else 1.0
+
+        final_violations = role_policy.semantic_violations(request, messages, actions, policy)
+        metadata["useful_step"] = not final_violations
         return ExecutionResult(
             agent_id=request.agent_profile.agent_id,
             updated_state=state,
@@ -265,7 +321,7 @@ def _request_prompt(request: ExecutionRequest) -> str:
             }
             for m in request.inbox_messages
         ],
-        "role_policy": _role_policy(request),
+        "role_policy": role_policy.build_role_policy(request),
     }
     return json.dumps(payload, ensure_ascii=True, sort_keys=True)
 
@@ -281,76 +337,6 @@ def _slim_payload(payload: dict[str, Any], max_list: int = 3) -> dict[str, Any]:
     return result
 
 
-def _role_policy(request: ExecutionRequest) -> dict[str, Any]:
-    scenario = request.environment.scenario
-    role = request.agent_profile.role
-    variables = request.environment.variables
-    event_payload = request.triggering_event.payload
-    policy: dict[str, Any] = {
-        "scenario": scenario,
-        "role": role,
-        "requirements": [],
-        "allowed_environment_actions": _allowed_environment_actions(scenario, role),
-    }
-    if role == "coordinator":
-        all_operator_ids = list(event_payload.get("operator_ids", []))
-        policy["requirements"].append(
-            {
-                "type": "outgoing_messages",
-                "instruction": "Send status_request to each operator_id listed in the triggering event payload.",
-                "example_operator_ids": all_operator_ids[:3],
-                "total_operators": len(all_operator_ids),
-                "message_type": MessageType.STATUS_REQUEST.value,
-            }
-        )
-        policy["requirements"].append(
-            {
-                "type": "environment_action",
-                "action_type": "update_summary",
-                "instruction": "Write a one-sentence summary of the event and which operators were contacted.",
-            }
-        )
-    elif role in {"hospital", "utility"}:
-        severity = int(variables.get("severity", 0))
-        policy["requirements"].append(
-            {
-                "type": "outgoing_message",
-                "recipient_id": event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator"),
-                "message_type": MessageType.STATUS_UPDATE.value,
-                "status": "strained" if severity >= 3 else "normal",
-            }
-        )
-    elif role == "forecaster":
-        policy["requirements"].append(
-            {
-                "type": "environment_action",
-                "action_type": "update_summary",
-                "instruction": "Write a one-sentence forecast: severity, regions, trend.",
-            }
-        )
-    elif role in {"supplier", "warehouse", "transport", "retailer"}:
-        risk_level = str(variables.get("risk_level", "normal"))
-        policy["requirements"].append(
-            {
-                "type": "outgoing_message",
-                "recipient_id": event_payload.get("coordinator_id") or event_payload.get("sender_id", "agent_coordinator"),
-                "message_type": MessageType.STATUS_UPDATE.value,
-                "status": "strained" if risk_level != "normal" else "normal",
-            }
-        )
-        if risk_level != "normal":
-            allowed = _allowed_environment_actions(scenario, role)
-            if allowed:
-                policy["requirements"].append(
-                    {
-                        "type": "environment_action",
-                        "action_type": allowed[0],
-                        "instruction": "Propose one concrete mitigation action.",
-                    }
-                )
-    return policy
-
-
 def _first_choice_text(response: dict[str, Any]) -> str:
     try:
         choice = response["choices"][0]
@@ -363,17 +349,77 @@ def _first_choice_text(response: dict[str, Any]) -> str:
     return content
 
 
-def _json_object(text: str) -> dict[str, Any]:
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        lines = cleaned.splitlines()
+def _strip_code_fence(text: str) -> str:
+    if text.startswith("```"):
+        lines = text.splitlines()
         start = 1  # skip opening fence line (```json or ```)
         end = len(lines) if lines[-1].strip() != "```" else len(lines) - 1
-        cleaned = "\n".join(lines[start:end])
-    data = json.loads(cleaned)
-    if not isinstance(data, dict):
-        raise ValueError("Aitta output must be a JSON object")
-    return data
+        return "\n".join(lines[start:end])
+    return text
+
+
+def _scan_balanced(text: str, start: int) -> str | None:
+    """Return the balanced {...} span beginning at `start`, or None if it never closes."""
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def _iter_json_candidates(text: str, limit: int = 5):
+    pos = 0
+    tried = 0
+    while tried < limit:
+        start = text.find("{", pos)
+        if start == -1:
+            return
+        span = _scan_balanced(text, start)
+        if span is not None:
+            yield span
+        pos = start + 1
+        tried += 1
+
+
+def _strip_trailing_commas(text: str) -> str:
+    return re.sub(r",\s*([}\]])", r"\1", text)
+
+
+def _json_object(text: str) -> dict[str, Any]:
+    cleaned = _strip_code_fence(text.strip())
+    last_exc: Exception = ValueError("no JSON object found in model output")
+    found_any_candidate = False
+    for candidate in _iter_json_candidates(cleaned):
+        found_any_candidate = True
+        for attempt in (candidate, _strip_trailing_commas(candidate)):
+            try:
+                data = json.loads(attempt)
+            except json.JSONDecodeError as exc:
+                last_exc = exc
+                continue
+            if isinstance(data, dict):
+                return data
+            last_exc = ValueError("Aitta output must be a JSON object")
+    if not found_any_candidate:
+        last_exc = ValueError("no balanced JSON object found in model output (possibly truncated)")
+    raise last_exc
 
 
 def _updated_state(request: ExecutionRequest, proposal: dict[str, Any]) -> AgentState:
@@ -463,142 +509,8 @@ def _events(request: ExecutionRequest, value: Any) -> list[Event]:
     return events
 
 
-def _ensure_required_messages(
-    request: ExecutionRequest, messages: list[Message], policy: dict[str, Any]
-) -> tuple[list[Message], int]:
-    required = _required_messages(request, policy)
-    existing = {(str(message.recipient_id), message.message_type) for message in messages}
-    added = []
-    for message in required:
-        key = (str(message.recipient_id), message.message_type)
-        if key not in existing:
-            added.append(message)
-            existing.add(key)
-    return messages + added, len(added)
-
-
-def _ensure_required_actions(
-    request: ExecutionRequest, actions: list[EnvironmentAction], policy: dict[str, Any]
-) -> tuple[list[EnvironmentAction], int]:
-    required = _required_actions(request, policy)
-    existing = {action.action_type for action in actions}
-    added = []
-    for action in required:
-        if action.action_type not in existing:
-            added.append(action)
-            existing.add(action.action_type)
-    return actions + added, len(added)
-
-
-def _required_messages(request: ExecutionRequest, policy: dict[str, Any]) -> list[Message]:
-    messages = []
-    for req in policy.get("requirements", []):
-        req_type = req.get("type", "")
-        if req_type == "outgoing_messages":
-            # Read from the triggering event payload (authoritative), not the policy summary
-            all_ids = list(request.triggering_event.payload.get("operator_ids", []))
-            for agent_id in all_ids:
-                messages.append(Message.create(
-                    sender_id=request.agent_profile.agent_id,
-                    recipient_id=AgentId(agent_id),
-                    message_type=MessageType(req["message_type"]),
-                    priority=request.triggering_event.priority,
-                    payload=_status_request_payload(request),
-                    correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
-                ))
-        elif req_type == "outgoing_message":
-            messages.append(Message.create(
-                sender_id=request.agent_profile.agent_id,
-                recipient_id=AgentId(req["recipient_id"]),
-                message_type=MessageType(req["message_type"]),
-                priority=request.triggering_event.priority,
-                payload=_status_update_payload(request),
-                correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
-            ))
-    return messages
-
-
-def _required_actions(request: ExecutionRequest, policy: dict[str, Any]) -> list[EnvironmentAction]:
-    actions = []
-    for req in policy.get("requirements", []):
-        if req.get("type") != "environment_action":
-            continue
-        action_type = req["action_type"]
-        actions.append(EnvironmentAction(
-            action_type=action_type,
-            payload=_action_payload(request, action_type),
-        ))
-    return actions
-
-
-def _action_payload(request: ExecutionRequest, action_type: str) -> dict[str, Any]:
-    if action_type == "adjust_inventory":
-        return {"region": request.agent_profile.region, "delta": 15}
-    if action_type == "adjust_transport_capacity":
-        return {"delta": 5}
-    return {
-        "summary": (
-            f"{request.agent_profile.role} reviewed "
-            f"{request.environment.scenario} "
-            f"event {request.triggering_event.event_type.value}"
-        )
-    }
-
-
-def _status_request_payload(request: ExecutionRequest) -> dict[str, Any]:
-    variables = request.environment.variables
-    if request.environment.scenario == "supply_chain":
-        return {
-            "demand": variables.get("demand", 0),
-            "risk_level": variables.get("risk_level", "normal"),
-            "summary": request.triggering_event.payload.get("summary", ""),
-        }
-    return {
-        "severity": variables.get("severity", 0),
-        "regions": list(variables.get("regions", [])),
-        "summary": request.triggering_event.payload.get("summary", ""),
-    }
-
-
-def _status_update_payload(request: ExecutionRequest) -> dict[str, Any]:
-    variables = request.environment.variables
-    role = request.agent_profile.role
-    payload: dict[str, Any] = {
-        "role": role,
-        "region": request.agent_profile.region,
-    }
-    if request.environment.scenario == "supply_chain":
-        risk_level = str(variables.get("risk_level", "normal"))
-        payload.update(
-            {
-                "status": "strained" if risk_level != "normal" else "normal",
-                "demand": variables.get("demand", 0),
-                "risk_level": risk_level,
-            }
-        )
-    else:
-        severity = int(variables.get("severity", 0))
-        payload.update(
-            {
-                "status": "strained" if severity >= 3 else "normal",
-                "severity": severity,
-            }
-        )
-    return payload
-
-
-def _allowed_environment_actions(scenario: str, role: str) -> list[str]:
-    if scenario == "storm" and role in {"coordinator", "forecaster"}:
-        return ["update_summary"]
-    if scenario == "storm" and role in {"hospital", "utility"}:
-        return ["adjust_capacity"]
-    if scenario == "supply_chain" and role in {"coordinator", "warehouse"}:
-        return ["update_summary"]
-    if scenario == "supply_chain" and role == "supplier":
-        return ["adjust_inventory"]
-    if scenario == "supply_chain" and role == "transport":
-        return ["adjust_transport_capacity"]
-    return []
+def _is_invalid(proposal: dict[str, Any]) -> bool:
+    return bool(proposal.get("metadata", {}).get("model_output_invalid"))
 
 
 def _optional_dict(data: dict[str, Any], key: str) -> dict[str, Any]:

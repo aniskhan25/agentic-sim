@@ -13,6 +13,7 @@ max_events_per_tick → config "scheduler.max_events_per_tick"
 storage_mode     → config "storage.mode"
 fixture          → config "scenario.parameters.fixture"
 scenario         → replaces the entire "scenario" field
+seed             → config top-level "seed" (a trial label, not consumed by any RNG today)
 
 Axes example (cross-product)::
 
@@ -31,6 +32,16 @@ Matrix example (explicit combinations)::
         {"steps": 4}
       ]
     }
+
+Repeat example (N trials of one config, distinguishable by seed)::
+
+    {
+      "base": "configs/demo_lumi.json",
+      "axes": {"seed": [0, 1, 2, 3, 4]}
+    }
+
+Run each generated config (e.g. via the `run_lumi_array.sh` array submission) and pass
+the output root to `agentic-sim aggregate-stats` to get mean/stdev across the 5 repeats.
 """
 from __future__ import annotations
 
@@ -53,6 +64,7 @@ SUPPORTED_KEYS: frozenset[str] = frozenset(
         "storage_mode",
         "fixture",
         "scenario",
+        "seed",
     }
 )
 
@@ -115,6 +127,8 @@ def apply_override(config: dict[str, Any], key: str, value: Any) -> None:
             config["scenario"] = s
     elif key == "scenario":
         config["scenario"] = value
+    elif key == "seed":
+        config["seed"] = int(value)
 
 
 def _entry_label(overrides: dict[str, Any]) -> str:
@@ -127,6 +141,7 @@ def _entry_label(overrides: dict[str, Any]) -> str:
         "storage_mode": "storage",
         "fixture": "fixture",
         "scenario": "scenario",
+        "seed": "seed",
     }
     parts = []
     for k, v in overrides.items():

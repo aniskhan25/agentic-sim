@@ -11,6 +11,7 @@ from agentic_sim.engine import create_engine
 from agentic_sim.execution import check_aitta_connection
 from agentic_sim.observability import (
     aggregate_run_artifacts,
+    aggregate_run_stats,
     build_run_summary,
     write_run_artifacts,
 )
@@ -37,6 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--aitta-model", help="Aitta model name")
     run.add_argument("--aitta-timeout", type=float, help="Aitta request timeout in seconds")
     run.add_argument("--aitta-max-retries", type=int, help="Aitta request retry count")
+    run.add_argument(
+        "--aitta-max-json-repair-attempts",
+        type=int,
+        help="Bounded re-prompt attempts when Aitta output isn't valid JSON",
+    )
     run.add_argument("--aitta-max-concurrency", type=int, help="Aitta request concurrency")
     run.add_argument("--aitta-temperature", type=float, help="Aitta sampling temperature")
     run.add_argument("--aitta-top-p", type=float, help="Aitta nucleus sampling value")
@@ -45,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Aitta max completion tokens per agent step",
     )
+    run.add_argument("--seed", type=int, help="Seed label for this run (for repeated-trial grouping)")
     run.add_argument("--output", help="Write full run artifact JSON to this path")
     run.add_argument("--output-dir", help="Write split run artifacts to this directory")
 
@@ -81,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate.add_argument("root_dir", help="Directory containing run artifact subdirectories")
     aggregate.add_argument("--output", help="Write aggregate JSON to this path")
 
+    aggregate_stats = subcommands.add_parser(
+        "aggregate-stats",
+        help="Group repeated runs by config (minus seed) and compute mean/stdev per metric",
+    )
+    aggregate_stats.add_argument("root_dir", help="Directory containing run artifact subdirectories")
+    aggregate_stats.add_argument("--output", help="Write aggregate stats JSON to this path")
+
     sweep = subcommands.add_parser(
         "generate-sweep",
         help="Generate a config file per sweep combination from a sweep spec",
@@ -102,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_aitta_command(args)
     if args.command == "aggregate-runs":
         return aggregate_runs_command(args)
+    if args.command == "aggregate-stats":
+        return aggregate_stats_command(args)
     if args.command == "generate-sweep":
         return generate_sweep_command(args)
     raise ValueError(args.command)
@@ -119,6 +135,7 @@ def run_command(args: argparse.Namespace) -> int:
             "max_batch_size": args.max_batch_size,
             "max_events_per_tick": args.max_events_per_tick,
             "agent_replicas": args.agent_replicas,
+            "seed": args.seed,
         },
     )
     config.backend_options.update(_aitta_cli_options(args))
@@ -168,6 +185,7 @@ def _aitta_cli_options(args: argparse.Namespace) -> dict[str, object]:
             "aitta_model": getattr(args, "aitta_model", None),
             "aitta_timeout": getattr(args, "aitta_timeout", None),
             "aitta_max_retries": getattr(args, "aitta_max_retries", None),
+            "aitta_max_json_repair_attempts": getattr(args, "aitta_max_json_repair_attempts", None),
             "aitta_max_concurrency": getattr(args, "aitta_max_concurrency", None),
             "aitta_temperature": getattr(args, "aitta_temperature", None),
             "aitta_top_p": getattr(args, "aitta_top_p", None),
@@ -221,6 +239,12 @@ def check_aitta_command(args: argparse.Namespace) -> int:
 
 def aggregate_runs_command(args: argparse.Namespace) -> int:
     payload = aggregate_run_artifacts(args.root_dir, args.output)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def aggregate_stats_command(args: argparse.Namespace) -> int:
+    payload = aggregate_run_stats(args.root_dir, args.output)
     print(json.dumps(payload, indent=2))
     return 0
 

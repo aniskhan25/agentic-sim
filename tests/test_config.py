@@ -1,8 +1,9 @@
+import json
 import unittest
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
-from agentic_sim.config import load_config
+from agentic_sim.config import load_config, merge_cli
 
 
 class ConfigTests(unittest.TestCase):
@@ -54,3 +55,22 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.backend_options["aitta_base_url"], "https://aitta.example/openai/v1/")
         self.assertEqual(config.backend_options["aitta_model"], "demo/model")
         self.assertEqual(config.backend_options["aitta_timeout"], 45)
+
+    def test_seed_defaults_to_none(self):
+        config = load_config(str(Path("configs") / "storm_small.json"))
+
+        self.assertIsNone(config.seed)
+
+    def test_seed_round_trips_through_load_and_merge(self):
+        with TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "seeded.json"
+            config_path.write_text(json.dumps({"seed": 3}))
+            config = load_config(str(config_path))
+
+        self.assertEqual(config.seed, 3)
+
+        overridden = merge_cli(config, {"seed": 7})
+        self.assertEqual(overridden.seed, 7)
+
+        unchanged = merge_cli(config, {"seed": None})
+        self.assertEqual(unchanged.seed, 3)

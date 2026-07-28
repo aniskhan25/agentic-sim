@@ -18,6 +18,7 @@ class RuntimeConfig:
     max_events_per_tick: int = 32
     agent_replicas: int = 1
     backend_options: dict[str, Any] = field(default_factory=dict)
+    seed: int | None = None
 
 
 def load_config(path: str | None) -> RuntimeConfig:
@@ -42,6 +43,7 @@ def load_config(path: str | None) -> RuntimeConfig:
         "aitta_temperature",
         "aitta_top_p",
         "aitta_max_completion_tokens",
+        "aitta_max_json_repair_attempts",
     ):
         if key in execution:
             backend_options[key] = execution[key]
@@ -59,6 +61,7 @@ def load_config(path: str | None) -> RuntimeConfig:
         if isinstance(data.get("scenario"), dict)
         else int(data.get("agent_replicas", 1)),
         backend_options=backend_options,
+        seed=data.get("seed"),
     )
 
 
@@ -74,6 +77,7 @@ def merge_cli(config: RuntimeConfig, overrides: dict[str, Any]) -> RuntimeConfig
         "max_events_per_tick": config.max_events_per_tick,
         "agent_replicas": config.agent_replicas,
         "backend_options": dict(config.backend_options),
+        "seed": config.seed,
     }
     values.update({key: value for key, value in overrides.items() if value is not None})
     return RuntimeConfig(**values)

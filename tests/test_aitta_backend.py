@@ -187,6 +187,347 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(len(calls), 3)
         self.assertEqual(result.metadata["retry_count"], 2)
 
+    def test_extracts_json_from_markdown_fence_with_language_tag(self):
+        calls = []
+
+        def transport(url, headers, payload, timeout):
+            calls.append(payload)
+            return {"choices": [{"message": {"content": '```json\n{"current_goal": "ok"}\n```'}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result.updated_state.current_goal, "ok")
+        self.assertNotIn("model_output_invalid", result.metadata)
+        self.assertEqual(result.metadata["json_repair_attempts"], 0)
+
+    def test_extracts_json_with_leading_and_trailing_commentary(self):
+        calls = []
+
+        def transport(url, headers, payload, timeout):
+            calls.append(payload)
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": 'Sure, here you go:\n{"current_goal": "ok"}\nHope that helps!'
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result.updated_state.current_goal, "ok")
+        self.assertNotIn("model_output_invalid", result.metadata)
+        self.assertEqual(result.metadata["json_repair_attempts"], 0)
+
+    def test_tolerates_trailing_comma(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": '{"current_goal": "ok",}'}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.updated_state.current_goal, "ok")
+        self.assertNotIn("model_output_invalid", result.metadata)
+
+    def test_truncated_json_falls_back_to_policy_guard(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": '{"outgoing_messages": ['}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_json_repair_attempts=0,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertTrue(result.metadata["model_output_invalid"])
+        self.assertEqual(len(result.outgoing_messages), 1)
+        self.assertEqual(result.outgoing_messages[0].message_type, MessageType.STATUS_REQUEST)
+        self.assertEqual(len(result.environment_actions), 1)
+
+    def test_reprompt_succeeds_on_second_attempt(self):
+        calls = []
+
+        def transport(url, headers, payload, timeout):
+            calls.append(payload)
+            if len(calls) == 1:
+                return {"choices": [{"message": {"content": "not json"}}]}
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_json_repair_attempts=1,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(len(calls), 2)
+        second_messages = calls[1]["messages"]
+        self.assertEqual(second_messages[-2]["role"], "assistant")
+        self.assertEqual(second_messages[-2]["content"], "not json")
+        self.assertIn("valid JSON", second_messages[-1]["content"])
+        self.assertEqual(result.metadata["json_repair_attempts"], 1)
+        self.assertNotIn("model_output_invalid", result.metadata)
+
+    def test_reprompt_exhausted_falls_back_to_policy_guard(self):
+        calls = []
+
+        def transport(url, headers, payload, timeout):
+            calls.append(payload)
+            return {"choices": [{"message": {"content": "not json"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_json_repair_attempts=1,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(result.metadata["json_repair_attempts"], 1)
+        self.assertTrue(result.metadata["model_output_invalid"])
+        self.assertEqual(len(result.outgoing_messages), 1)
+        self.assertEqual(len(result.environment_actions), 1)
+
+    def test_json_repair_attempts_zero_disables_reprompt(self):
+        calls = []
+
+        def transport(url, headers, payload, timeout):
+            calls.append(payload)
+            return {"choices": [{"message": {"content": "not json"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_json_repair_attempts=0,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(result.metadata["model_output_invalid"])
+        self.assertEqual(result.metadata["json_repair_attempts"], 0)
+
+    def test_must_not_self_message_is_stripped_and_counted(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_coordinator",
+                                            "message_type": "status_request",
+                                            "payload": {},
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.metadata["must_not_violations"], 1)
+        # self-message stripped; guard fills the real required message instead
+        self.assertEqual(len(result.outgoing_messages), 1)
+        self.assertEqual(result.outgoing_messages[0].recipient_id, AgentId("agent_hospital"))
+
+    def test_must_not_action_outside_allowed_set_for_supply_chain_supplier(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "environment_actions": [
+                                        {"action_type": "adjust_transport_capacity", "payload": {}}
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        request = _role_request("supply_chain", "supplier", {"risk_level": "normal"})
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(result.metadata["must_not_violations"], 1)
+        self.assertFalse(result.metadata["semantic_valid"])
+        self.assertEqual(len(result.environment_actions), 0)
+
+    def test_must_not_action_outside_allowed_set_for_storm_hospital(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {"environment_actions": [{"action_type": "adjust_inventory", "payload": {}}]}
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        request = _role_request("storm", "hospital", {"severity": 1})
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(result.metadata["must_not_violations"], 1)
+        self.assertFalse(result.metadata["semantic_valid"])
+        self.assertEqual(len(result.environment_actions), 0)
+
+    def test_autonomy_rate_is_one_when_model_fully_autonomous(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_hospital",
+                                            "message_type": "status_request",
+                                            "payload": {"severity": 4},
+                                        }
+                                    ],
+                                    "environment_actions": [
+                                        {"action_type": "update_summary", "payload": {"summary": "ok"}}
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.metadata["policy_guard_added_messages"], 0)
+        self.assertEqual(result.metadata["policy_guard_added_actions"], 0)
+        self.assertEqual(result.metadata["autonomy_rate"], 1.0)
+
+    def test_autonomy_rate_is_zero_on_invalid_json(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": "not json"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            max_json_repair_attempts=0,
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.metadata["autonomy_rate"], 0.0)
+
+    def test_autonomy_rate_is_partial_when_model_supplies_some_required_outputs(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_hospital",
+                                            "message_type": "status_request",
+                                            "payload": {"severity": 4},
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        # model supplied the message but not the required update_summary action
+        self.assertEqual(result.metadata["policy_guard_added_messages"], 0)
+        self.assertEqual(result.metadata["policy_guard_added_actions"], 1)
+        self.assertEqual(result.metadata["autonomy_rate"], 0.5)
 
     def test_request_prompt_contains_agent_and_role_policy(self):
         """Prompt includes agent context and role_policy; response_shape is omitted to save tokens."""
@@ -216,6 +557,42 @@ class AittaBackendTests(unittest.TestCase):
             any("agent_hospital" in req.get("example_operator_ids", []) for req in requirements),
             "example_operator_ids should reference agent_hospital",
         )
+
+
+def _role_request(scenario: str, role: str, variables: dict) -> ExecutionRequest:
+    now = utc_now()
+    agent_id = AgentId(f"agent_{role}")
+    event = Event.create(
+        EventType.ENVIRONMENT_UPDATE,
+        source="environment",
+        target_scope={"roles": [role]},
+        payload={"coordinator_id": "agent_coordinator"},
+        priority=2,
+    )
+    return ExecutionRequest(
+        activation=Activation.create(
+            agent_id=agent_id,
+            trigger_event_id=event.event_id,
+            activation_reason=event.event_type.value,
+            priority=event.priority,
+            ready_at=now,
+        ),
+        agent_profile=AgentProfile(
+            agent_id=agent_id,
+            role=role,
+            name=role.title(),
+            region="helsinki",
+        ),
+        agent_state=AgentState(agent_id=agent_id),
+        inbox_messages=[],
+        triggering_event=event,
+        environment=EnvironmentState(
+            scenario=scenario,
+            tick=1,
+            updated_at=now,
+            variables=variables,
+        ),
+    )
 
 
 def _request() -> ExecutionRequest:

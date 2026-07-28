@@ -142,6 +142,11 @@ class ApplyOverrideTests(unittest.TestCase):
         apply_override(cfg, "scenario", "supply_chain")
         self.assertEqual(cfg["scenario"], "supply_chain")
 
+    def test_seed(self):
+        cfg = _base_config()
+        apply_override(cfg, "seed", 3)
+        self.assertEqual(cfg["seed"], 3)
+
     def test_unknown_key_raises(self):
         cfg = _base_config()
         with self.assertRaises(ValueError):
@@ -242,3 +247,23 @@ class GenerateSweepTests(unittest.TestCase):
             out = Path(tmp) / "out"
             manifest = generate_sweep(spec, output_dir=out)
         self.assertIn("16", Path(manifest["configs"][0]).name)
+
+    def test_seed_axis_generates_n_repeats_with_identical_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = self._make_base(tmp)
+            spec = Path(tmp) / "spec.json"
+            _write_json(spec, {
+                "base": str(base),
+                "axes": {"seed": [0, 1, 2, 3, 4]},
+            })
+            out = Path(tmp) / "out"
+            manifest = generate_sweep(spec, output_dir=out)
+
+            self.assertEqual(manifest["total"], 5)
+            seeds = []
+            for config_path in manifest["configs"]:
+                cfg = json.loads(Path(config_path).read_text())
+                seeds.append(cfg["seed"])
+                other_keys = {k: v for k, v in cfg.items() if k != "seed"}
+                self.assertEqual(other_keys, _base_config())
+            self.assertEqual(sorted(seeds), [0, 1, 2, 3, 4])

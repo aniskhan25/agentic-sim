@@ -63,6 +63,31 @@ class CliTests(unittest.TestCase):
             self.assertEqual(metadata["scenario"], "storm")
             self.assertEqual(metadata["backend"], "mock")
 
+    def test_run_command_persists_seed_in_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "artifacts"
+
+            with redirect_stdout(StringIO()):
+                exit_code = main(
+                    [
+                        "run",
+                        "--scenario",
+                        "storm",
+                        "--steps",
+                        "1",
+                        "--seed",
+                        "2",
+                        "--output-dir",
+                        str(output_dir),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            metadata = json.loads((output_dir / "metadata.json").read_text())
+            config_snapshot = json.loads((output_dir / "config.json").read_text())
+            self.assertEqual(metadata["seed"], 2)
+            self.assertEqual(config_snapshot["seed"], 2)
+
     def test_aggregate_runs_reads_split_artifacts(self):
         with TemporaryDirectory() as tmpdir:
             root = Path(tmpdir) / "runs"
@@ -81,6 +106,49 @@ class CliTests(unittest.TestCase):
             self.assertTrue(aggregate.exists())
             saved = json.loads(aggregate.read_text())
             self.assertEqual(saved["runs"][0]["metadata"]["scenario"], "storm")
+
+    def test_aggregate_stats_groups_repeated_runs(self):
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            stats_path = root / "aggregate_stats.json"
+
+            with redirect_stdout(StringIO()):
+                main(
+                    [
+                        "run",
+                        "--scenario",
+                        "storm",
+                        "--steps",
+                        "1",
+                        "--seed",
+                        "0",
+                        "--output-dir",
+                        str(root / "run_0"),
+                    ]
+                )
+                main(
+                    [
+                        "run",
+                        "--scenario",
+                        "storm",
+                        "--steps",
+                        "1",
+                        "--seed",
+                        "1",
+                        "--output-dir",
+                        str(root / "run_1"),
+                    ]
+                )
+
+            with redirect_stdout(StringIO()) as stdout:
+                exit_code = main(["aggregate-stats", str(root), "--output", str(stats_path)])
+
+            self.assertEqual(exit_code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["group_count"], 1)
+            self.assertEqual(payload["groups"][0]["run_count"], 2)
+            self.assertEqual(payload["groups"][0]["seeds"], [0, 1])
+            self.assertTrue(stats_path.exists())
 
     def test_run_command_loads_supply_chain_config(self):
         with redirect_stdout(StringIO()) as stdout:
