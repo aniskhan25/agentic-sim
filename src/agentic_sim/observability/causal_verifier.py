@@ -82,7 +82,12 @@ def _check_missing_parents(steps: list[dict[str, Any]]) -> list[CausalViolation]
     return violations
 
 
-def _check_cycles(steps: list[dict[str, Any]]) -> list[CausalViolation]:
+def build_message_edges(steps: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Map each activation_id to the activation_ids of its message-mediated
+    causal parents (the activations that produced the messages it read).
+    Reused by _check_cycles and by observability/kernel_invariants.py's
+    graph_metrics -- both need the same message-mediated dependency graph.
+    """
     producer_by_message: dict[str, str] = {}
     for step in steps:
         for message_id in step.get("outgoing_message_ids", []):
@@ -94,6 +99,11 @@ def _check_cycles(steps: list[dict[str, Any]]) -> list[CausalViolation]:
             producer = producer_by_message.get(parent_id)
             if producer is not None and producer in edges:
                 edges[step["activation_id"]].append(producer)
+    return edges
+
+
+def _check_cycles(steps: list[dict[str, Any]]) -> list[CausalViolation]:
+    edges = build_message_edges(steps)
 
     visiting: set[str] = set()
     visited: set[str] = set()

@@ -58,6 +58,22 @@ class EngineTests(unittest.TestCase):
         self.assertIn("total_ms", timing)
         self.assertEqual(tick_traces[-1].payload["batches"], 4)
 
+    def test_engine_splits_result_application_timing_into_components(self):
+        engine = create_storm_engine(agent_replicas=2, max_batch_size=2)
+
+        engine.run(1)
+
+        tick_traces = [
+            trace for trace in engine.store.traces.list() if trace.event_name == "simulation_tick"
+        ]
+        timing = tick_traces[-1].payload["timing_ms"]
+        self.assertIn("state_commit_ms", timing)
+        self.assertIn("message_delivery_ms", timing)
+        self.assertIn("tracing_ms", timing)
+        self.assertNotIn("result_application_ms", timing)
+        for key in ("state_commit_ms", "message_delivery_ms", "tracing_ms"):
+            self.assertGreaterEqual(timing[key], 0.0)
+
     def test_engine_factory_selects_registered_scenario(self):
         engine = create_engine(scenario="storm")
 

@@ -16,6 +16,7 @@ class EventType(StrEnum):
     SHIPMENT_DELAY = "shipment_delay"
     INVENTORY_SHORTAGE = "inventory_shortage"
     MESSAGE_ARRIVED = "message_arrived"
+    SYNTHETIC_TRIGGER = "synthetic_trigger"
 
 
 @dataclass(slots=True)

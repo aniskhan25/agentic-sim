@@ -96,14 +96,25 @@ class SimulationEngine:
         environment_actions = []
         emitted_events: list[Event] = []
 
-        started = perf_counter()
+        timings["state_commit_ms"] = 0.0
+        timings["message_delivery_ms"] = 0.0
+        timings["tracing_ms"] = 0.0
         for result in results:
             req = request_by_agent[result.agent_id]
+
+            started = perf_counter()
             self.store.agents.put_state(result.updated_state)
+            timings["state_commit_ms"] += _elapsed_ms(started)
+
             emitted_messages += len(result.outgoing_messages)
+            started = perf_counter()
             self.router.deliver(result.outgoing_messages, self.store)
+            timings["message_delivery_ms"] += _elapsed_ms(started)
+
             environment_actions.extend(result.environment_actions)
             emitted_events.extend(result.emitted_events)
+
+            started = perf_counter()
             self.telemetry.record_event(
                 event_name="agent_step",
                 payload={
@@ -120,8 +131,8 @@ class SimulationEngine:
                     "metadata": result.metadata,
                 },
             )
+            timings["tracing_ms"] += _elapsed_ms(started)
             traces_written += 1
-        timings["result_application_ms"] = _elapsed_ms(started)
 
         started = perf_counter()
         if environment_actions:

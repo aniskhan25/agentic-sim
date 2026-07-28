@@ -6,6 +6,7 @@ from agentic_sim.scenarios import (
     create_storm_store,
     create_supply_chain_engine,
     create_supply_chain_store,
+    create_synthetic_engine,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "create_storm_store",
     "create_supply_chain_engine",
     "create_supply_chain_store",
+    "create_synthetic_engine",
 ]

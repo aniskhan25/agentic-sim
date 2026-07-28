@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from agentic_sim.scenarios.storm import create_storm_engine
 from agentic_sim.scenarios.supply_chain import create_supply_chain_engine
+from agentic_sim.scenarios.synthetic import create_synthetic_engine
 
 if TYPE_CHECKING:
     from agentic_sim.engine.simulation_engine import SimulationEngine
@@ -14,6 +15,7 @@ ScenarioFactory = Callable[..., "SimulationEngine"]
 SCENARIOS: dict[str, ScenarioFactory] = {
     "storm": create_storm_engine,
     "supply_chain": create_supply_chain_engine,
+    "synthetic": create_synthetic_engine,
 }
 
 

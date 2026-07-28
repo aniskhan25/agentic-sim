@@ -1,0 +1,503 @@
+{
+  "shapes": [
+    {
+      "shape": "chain",
+      "params": {
+        "length": 4
+      },
+      "steps": 4,
+      "repeats": 5,
+      "graph_metrics": {
+        "node_count": 4,
+        "edge_count": 3,
+        "max_depth": 3,
+        "component_count": 1,
+        "max_in_degree": 1
+      },
+      "timing_ms": {
+        "event_loading_ms": {
+          "count": 20,
+          "min": 0.001,
+          "mean": 0.005,
+          "max": 0.047
+        },
+        "scheduling_ms": {
+          "count": 20,
+          "min": 0.005,
+          "mean": 0.008,
+          "max": 0.026
+        },
+        "context_building_ms": {
+          "count": 20,
+          "min": 0.002,
+          "mean": 0.003,
+          "max": 0.012
+        },
+        "batching_ms": {
+          "count": 20,
+          "min": 0.001,
+          "mean": 0.002,
+          "max": 0.009
+        },
+        "backend_execution_ms": {
+          "count": 20,
+          "min": 0.004,
+          "mean": 0.026,
+          "max": 0.32
+        },
+        "state_commit_ms": {
+          "count": 20,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.001
+        },
+        "message_delivery_ms": {
+          "count": 20,
+          "min": 0.001,
+          "mean": 0.006,
+          "max": 0.014
+        },
+        "tracing_ms": {
+          "count": 20,
+          "min": 0.004,
+          "mean": 0.005,
+          "max": 0.013
+        },
+        "environment_actions_ms": {
+          "count": 20,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "event_persistence_ms": {
+          "count": 20,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "total_ms": {
+          "count": 20,
+          "min": 0.023,
+          "mean": 0.062,
+          "max": 0.375
+        }
+      }
+    },
+    {
+      "shape": "fan_out",
+      "params": {
+        "width": 3
+      },
+      "steps": 2,
+      "repeats": 5,
+      "graph_metrics": {
+        "node_count": 4,
+        "edge_count": 3,
+        "max_depth": 1,
+        "component_count": 1,
+        "max_in_degree": 1
+      },
+      "timing_ms": {
+        "event_loading_ms": {
+          "count": 10,
+          "min": 0.002,
+          "mean": 0.005,
+          "max": 0.011
+        },
+        "scheduling_ms": {
+          "count": 10,
+          "min": 0.007,
+          "mean": 0.012,
+          "max": 0.017
+        },
+        "context_building_ms": {
+          "count": 10,
+          "min": 0.002,
+          "mean": 0.004,
+          "max": 0.006
+        },
+        "batching_ms": {
+          "count": 10,
+          "min": 0.001,
+          "mean": 0.001,
+          "max": 0.002
+        },
+        "backend_execution_ms": {
+          "count": 10,
+          "min": 0.011,
+          "mean": 0.014,
+          "max": 0.019
+        },
+        "state_commit_ms": {
+          "count": 10,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "message_delivery_ms": {
+          "count": 10,
+          "min": 0.003,
+          "mean": 0.01,
+          "max": 0.02
+        },
+        "tracing_ms": {
+          "count": 10,
+          "min": 0.005,
+          "mean": 0.009,
+          "max": 0.016
+        },
+        "environment_actions_ms": {
+          "count": 10,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "event_persistence_ms": {
+          "count": 10,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "total_ms": {
+          "count": 10,
+          "min": 0.057,
+          "mean": 0.063,
+          "max": 0.071
+        }
+      }
+    },
+    {
+      "shape": "fork_join",
+      "params": {
+        "width": 3
+      },
+      "steps": 3,
+      "repeats": 5,
+      "graph_metrics": {
+        "node_count": 5,
+        "edge_count": 6,
+        "max_depth": 2,
+        "component_count": 1,
+        "max_in_degree": 3
+      },
+      "timing_ms": {
+        "event_loading_ms": {
+          "count": 15,
+          "min": 0.001,
+          "mean": 0.004,
+          "max": 0.009
+        },
+        "scheduling_ms": {
+          "count": 15,
+          "min": 0.007,
+          "mean": 0.01,
+          "max": 0.015
+        },
+        "context_building_ms": {
+          "count": 15,
+          "min": 0.002,
+          "mean": 0.003,
+          "max": 0.006
+        },
+        "batching_ms": {
+          "count": 15,
+          "min": 0.001,
+          "mean": 0.001,
+          "max": 0.002
+        },
+        "backend_execution_ms": {
+          "count": 15,
+          "min": 0.004,
+          "mean": 0.015,
+          "max": 0.024
+        },
+        "state_commit_ms": {
+          "count": 15,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "message_delivery_ms": {
+          "count": 15,
+          "min": 0.001,
+          "mean": 0.011,
+          "max": 0.017
+        },
+        "tracing_ms": {
+          "count": 15,
+          "min": 0.004,
+          "mean": 0.008,
+          "max": 0.015
+        },
+        "environment_actions_ms": {
+          "count": 15,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "event_persistence_ms": {
+          "count": 15,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "total_ms": {
+          "count": 15,
+          "min": 0.028,
+          "mean": 0.059,
+          "max": 0.087
+        }
+      }
+    },
+    {
+      "shape": "independent_branches",
+      "params": {
+        "branch_count": 3,
+        "length": 3
+      },
+      "steps": 3,
+      "repeats": 5,
+      "graph_metrics": {
+        "node_count": 9,
+        "edge_count": 6,
+        "max_depth": 2,
+        "component_count": 3,
+        "max_in_degree": 1
+      },
+      "timing_ms": {
+        "event_loading_ms": {
+          "count": 15,
+          "min": 0.002,
+          "mean": 0.004,
+          "max": 0.009
+        },
+        "scheduling_ms": {
+          "count": 15,
+          "min": 0.014,
+          "mean": 0.015,
+          "max": 0.017
+        },
+        "context_building_ms": {
+          "count": 15,
+          "min": 0.005,
+          "mean": 0.005,
+          "max": 0.006
+        },
+        "batching_ms": {
+          "count": 15,
+          "min": 0.001,
+          "mean": 0.001,
+          "max": 0.002
+        },
+        "backend_execution_ms": {
+          "count": 15,
+          "min": 0.01,
+          "mean": 0.019,
+          "max": 0.027
+        },
+        "state_commit_ms": {
+          "count": 15,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "message_delivery_ms": {
+          "count": 15,
+          "min": 0.003,
+          "mean": 0.013,
+          "max": 0.02
+        },
+        "tracing_ms": {
+          "count": 15,
+          "min": 0.012,
+          "mean": 0.013,
+          "max": 0.013
+        },
+        "environment_actions_ms": {
+          "count": 15,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "event_persistence_ms": {
+          "count": 15,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "total_ms": {
+          "count": 15,
+          "min": 0.054,
+          "mean": 0.078,
+          "max": 0.097
+        }
+      }
+    },
+    {
+      "shape": "mixed_dag",
+      "params": {
+        "length": 3
+      },
+      "steps": 4,
+      "repeats": 5,
+      "graph_metrics": {
+        "node_count": 7,
+        "edge_count": 6,
+        "max_depth": 3,
+        "component_count": 1,
+        "max_in_degree": 2
+      },
+      "timing_ms": {
+        "event_loading_ms": {
+          "count": 20,
+          "min": 0.001,
+          "mean": 0.003,
+          "max": 0.009
+        },
+        "scheduling_ms": {
+          "count": 20,
+          "min": 0.007,
+          "mean": 0.01,
+          "max": 0.012
+        },
+        "context_building_ms": {
+          "count": 20,
+          "min": 0.002,
+          "mean": 0.003,
+          "max": 0.004
+        },
+        "batching_ms": {
+          "count": 20,
+          "min": 0.001,
+          "mean": 0.001,
+          "max": 0.002
+        },
+        "backend_execution_ms": {
+          "count": 20,
+          "min": 0.004,
+          "mean": 0.013,
+          "max": 0.017
+        },
+        "state_commit_ms": {
+          "count": 20,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "message_delivery_ms": {
+          "count": 20,
+          "min": 0.001,
+          "mean": 0.008,
+          "max": 0.013
+        },
+        "tracing_ms": {
+          "count": 20,
+          "min": 0.004,
+          "mean": 0.007,
+          "max": 0.009
+        },
+        "environment_actions_ms": {
+          "count": 20,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "event_persistence_ms": {
+          "count": 20,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "total_ms": {
+          "count": 20,
+          "min": 0.025,
+          "mean": 0.052,
+          "max": 0.073
+        }
+      }
+    },
+    {
+      "shape": "conflicting_write",
+      "params": {
+        "writers": 3
+      },
+      "steps": 1,
+      "repeats": 5,
+      "graph_metrics": {
+        "node_count": 3,
+        "edge_count": 0,
+        "max_depth": 0,
+        "component_count": 3,
+        "max_in_degree": 0
+      },
+      "timing_ms": {
+        "event_loading_ms": {
+          "count": 5,
+          "min": 0.007,
+          "mean": 0.008,
+          "max": 0.009
+        },
+        "scheduling_ms": {
+          "count": 5,
+          "min": 0.012,
+          "mean": 0.013,
+          "max": 0.014
+        },
+        "context_building_ms": {
+          "count": 5,
+          "min": 0.004,
+          "mean": 0.004,
+          "max": 0.005
+        },
+        "batching_ms": {
+          "count": 5,
+          "min": 0.001,
+          "mean": 0.001,
+          "max": 0.002
+        },
+        "backend_execution_ms": {
+          "count": 5,
+          "min": 0.011,
+          "mean": 0.012,
+          "max": 0.016
+        },
+        "state_commit_ms": {
+          "count": 5,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "message_delivery_ms": {
+          "count": 5,
+          "min": 0.003,
+          "mean": 0.003,
+          "max": 0.003
+        },
+        "tracing_ms": {
+          "count": 5,
+          "min": 0.012,
+          "mean": 0.013,
+          "max": 0.013
+        },
+        "environment_actions_ms": {
+          "count": 5,
+          "min": 0.002,
+          "mean": 0.003,
+          "max": 0.006
+        },
+        "event_persistence_ms": {
+          "count": 5,
+          "min": 0.0,
+          "mean": 0.0,
+          "max": 0.0
+        },
+        "total_ms": {
+          "count": 5,
+          "min": 0.061,
+          "mean": 0.065,
+          "max": 0.077
+        }
+      }
+    }
+  ]
+}

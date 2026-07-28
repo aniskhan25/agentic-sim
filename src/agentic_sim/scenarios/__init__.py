@@ -4,6 +4,11 @@ from agentic_sim.scenarios.supply_chain import (
     create_supply_chain_engine,
     create_supply_chain_store,
 )
+from agentic_sim.scenarios.synthetic import (
+    create_synthetic_engine,
+    expected_invariants,
+    step_count_for,
+)
 
 __all__ = [
     "SCENARIOS",
@@ -13,4 +18,7 @@ __all__ = [
     "create_storm_store",
     "create_supply_chain_engine",
     "create_supply_chain_store",
+    "create_synthetic_engine",
+    "expected_invariants",
+    "step_count_for",
 ]

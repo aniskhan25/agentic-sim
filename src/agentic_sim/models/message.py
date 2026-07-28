@@ -15,6 +15,7 @@ class MessageType(StrEnum):
     STATUS_UPDATE = "status_update"
     FORECAST_UPDATE = "forecast_update"
     COORDINATION_NOTICE = "coordination_notice"
+    SYNTHETIC_HOP = "synthetic_hop"
 
 
 @dataclass(slots=True)
