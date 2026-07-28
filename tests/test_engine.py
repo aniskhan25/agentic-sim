@@ -6,6 +6,30 @@ from agentic_sim.engine import (
     create_storm_engine,
     create_supply_chain_engine,
 )
+from agentic_sim.utils.time import utc_now
+
+
+class FakeClock:
+    """Structurally satisfies the Clock port with no inheritance needed."""
+
+    def __init__(self):
+        self.now = utc_now()
+        self.advance_calls = 0
+
+    def advance(self):
+        self.advance_calls += 1
+        return self.now
+
+
+class FakeTelemetry:
+    """Structurally satisfies the Telemetry port; records events in memory
+    instead of writing to a trace store."""
+
+    def __init__(self):
+        self.events = []
+
+    def record_event(self, event_name, payload):
+        self.events.append((event_name, payload))
 
 
 class EngineTests(unittest.TestCase):
@@ -63,3 +87,34 @@ class EngineTests(unittest.TestCase):
     def test_engine_factory_rejects_unknown_scenario(self):
         with self.assertRaisesRegex(ValueError, "unsupported scenario"):
             create_engine(scenario="unknown")
+
+    def test_clock_port_can_be_substituted(self):
+        engine = create_storm_engine()
+        fake_clock = FakeClock()
+        engine.clock = fake_clock
+
+        engine.step()
+
+        self.assertEqual(fake_clock.advance_calls, 1)
+
+    def test_telemetry_port_can_be_substituted(self):
+        engine = create_storm_engine()
+        fake_telemetry = FakeTelemetry()
+        engine.telemetry = fake_telemetry
+
+        engine.run(2)
+
+        event_names = [name for name, _ in fake_telemetry.events]
+        self.assertIn("agent_step", event_names)
+        self.assertEqual(event_names.count("simulation_tick"), 2)
+        # nothing went to the real trace store once telemetry was substituted
+        self.assertEqual(len(engine.store.traces.list()), 0)
+
+    def test_local_telemetry_default_path_matches_pre_port_behavior(self):
+        engine = create_storm_engine()
+
+        engine.run(1)
+
+        event_names = [trace.event_name for trace in engine.store.traces.list()]
+        self.assertIn("agent_step", event_names)
+        self.assertIn("simulation_tick", event_names)

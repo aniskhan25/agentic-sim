@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Protocol
 
 from agentic_sim.utils.time import utc_now
+
+
+class Clock(Protocol):
+    now: datetime
+
+    def advance(self) -> datetime: ...
 
 
 @dataclass(slots=True)
