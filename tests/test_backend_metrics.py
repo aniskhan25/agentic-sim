@@ -18,8 +18,8 @@ def _tick(backend_execution_ms: float) -> SimpleNamespace:
 class BackendMetricsTests(unittest.TestCase):
     def test_useful_agent_steps_per_second_uses_tick_wall_clock_not_summed_latency(self):
         traces = [
-            _agent_step({"latency_seconds": 5.0, "useful_step": True, "autonomy_rate": 1.0}),
-            _agent_step({"latency_seconds": 5.0, "useful_step": True, "autonomy_rate": 1.0}),
+            _agent_step({"latency_seconds": 5.0, "useful_step": True, "message_action_autonomy_rate": 1.0}),
+            _agent_step({"latency_seconds": 5.0, "useful_step": True, "message_action_autonomy_rate": 1.0}),
             _tick(1000),  # 1s real wall-clock for both steps combined, e.g. under concurrent dispatch
         ]
 
@@ -33,8 +33,8 @@ class BackendMetricsTests(unittest.TestCase):
 
     def test_must_not_semantic_and_autonomy_fields_aggregate(self):
         traces = [
-            _agent_step({"must_not_violations": 1, "semantic_valid": False, "autonomy_rate": 0.0}),
-            _agent_step({"must_not_violations": 0, "semantic_valid": True, "autonomy_rate": 1.0}),
+            _agent_step({"must_not_violations": 1, "semantic_valid": False, "message_action_autonomy_rate": 0.0}),
+            _agent_step({"must_not_violations": 0, "semantic_valid": True, "message_action_autonomy_rate": 1.0}),
         ]
 
         metrics = _backend_metrics(traces)
@@ -42,8 +42,8 @@ class BackendMetricsTests(unittest.TestCase):
         self.assertEqual(metrics["backend_steps"], 2)
         self.assertEqual(metrics["must_not_violations"], 1)
         self.assertEqual(metrics["semantic_valid_count"], 1)
-        self.assertEqual(metrics["autonomy_rate"]["count"], 2)
-        self.assertAlmostEqual(metrics["autonomy_rate"]["avg"], 0.5)
+        self.assertEqual(metrics["message_action_autonomy_rate"]["count"], 2)
+        self.assertAlmostEqual(metrics["message_action_autonomy_rate"]["avg"], 0.5)
 
     def test_useful_agent_steps_per_second_is_none_without_tick_traces(self):
         traces = [_agent_step({"useful_step": True})]
@@ -53,3 +53,17 @@ class BackendMetricsTests(unittest.TestCase):
         self.assertIsNone(metrics["useful_agent_steps_per_second"])
         self.assertEqual(metrics["backend_execution_wall_seconds"], 0.0)
         self.assertEqual(metrics["useful_steps"], 1)
+
+    def test_autonomy_unavailable_distinguished_from_field_absent(self):
+        traces = [
+            # a real Aitta step where the rate was computed as unavailable (empty commit)
+            _agent_step({"useful_step": True, "message_action_autonomy_rate": None}),
+            # a mock/rule-backend step that never sets the field at all
+            _agent_step({"useful_step": True}),
+        ]
+
+        metrics = _backend_metrics(traces)
+
+        self.assertEqual(metrics["backend_steps"], 2)
+        self.assertEqual(metrics["message_action_autonomy_unavailable_steps"], 1)
+        self.assertEqual(metrics["message_action_autonomy_rate"]["count"], 0)

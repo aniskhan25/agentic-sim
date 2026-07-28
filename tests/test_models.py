@@ -71,7 +71,8 @@ class ModelTests(unittest.TestCase):
         jsonable = to_jsonable(result)
         self.assertFalse(jsonable["semantic_valid"])
         self.assertEqual(jsonable["violation_reasons"], ["self_message: x"])
-        self.assertEqual(jsonable["autonomy_rate"], 1.0)
+        self.assertIsNone(jsonable["message_action_autonomy_rate"])
+        self.assertEqual(jsonable["message_action_committed_atom_count"], 0)
         self.assertTrue(jsonable["useful_step"])
 
     def test_execution_receipt_unknown_fields_stay_none_not_fake(self):

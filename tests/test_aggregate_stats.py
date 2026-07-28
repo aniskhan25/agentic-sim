@@ -174,7 +174,7 @@ class AggregateRunStatsTests(unittest.TestCase):
                     extra_metrics={
                         "must_not_violations": 1,
                         "semantic_valid_count": 80,
-                        "autonomy_rate": {"avg": autonomy},
+                        "message_action_autonomy_rate": {"avg": autonomy},
                         "useful_agent_steps_per_second": throughput,
                     },
                 )
@@ -184,11 +184,40 @@ class AggregateRunStatsTests(unittest.TestCase):
         group = payload["groups"][0]
         self.assertAlmostEqual(group["must_not_violation_rate"]["mean"], 0.01, places=5)
         self.assertAlmostEqual(group["semantic_valid_rate"]["mean"], 0.8, places=5)
-        self.assertAlmostEqual(group["autonomy_rate_mean"]["mean"], statistics.mean(autonomy_avgs), places=5)
+        self.assertAlmostEqual(
+            group["message_action_autonomy_rate_mean"]["mean"], statistics.mean(autonomy_avgs), places=5
+        )
         self.assertAlmostEqual(
             group["useful_agent_steps_per_second_mean"]["mean"], statistics.mean(throughputs), places=5
         )
         self.assertEqual(group["useful_agent_steps_per_second_mean"]["count"], 3)
+
+    def test_message_action_autonomy_unavailable_rate_aggregates_across_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unavailable_counts = [10, 20, 30]
+            for i, unavailable in enumerate(unavailable_counts):
+                _write_run(
+                    root,
+                    f"run_{i}",
+                    model="TinyLlama-1.1B-Chat-v1.0",
+                    seed=i,
+                    invalid=10,
+                    guard_messages=2,
+                    guard_actions=1,
+                    latency_avg=1.4,
+                    extra_metrics={"message_action_autonomy_unavailable_steps": unavailable},
+                )
+
+            payload = aggregate_run_stats(root)
+
+        group = payload["groups"][0]
+        expected_rates = [c / 100 for c in unavailable_counts]
+        self.assertAlmostEqual(
+            group["message_action_autonomy_unavailable_rate"]["mean"],
+            statistics.mean(expected_rates),
+            places=5,
+        )
 
     def test_output_path_writes_json_file(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -439,7 +439,7 @@ class AittaBackendTests(unittest.TestCase):
         self.assertFalse(result.metadata["semantic_valid"])
         self.assertEqual(len(result.environment_actions), 0)
 
-    def test_autonomy_rate_is_one_when_model_fully_autonomous(self):
+    def test_message_action_autonomy_rate_is_one_when_model_fully_autonomous(self):
         def transport(url, headers, payload, timeout):
             return {
                 "choices": [
@@ -475,9 +475,9 @@ class AittaBackendTests(unittest.TestCase):
 
         self.assertEqual(result.metadata["policy_guard_added_messages"], 0)
         self.assertEqual(result.metadata["policy_guard_added_actions"], 0)
-        self.assertEqual(result.metadata["autonomy_rate"], 1.0)
+        self.assertEqual(result.metadata["message_action_autonomy_rate"], 1.0)
 
-    def test_autonomy_rate_is_zero_on_invalid_json(self):
+    def test_message_action_autonomy_rate_is_zero_on_invalid_json(self):
         def transport(url, headers, payload, timeout):
             return {"choices": [{"message": {"content": "not json"}}]}
 
@@ -491,9 +491,9 @@ class AittaBackendTests(unittest.TestCase):
 
         result = backend.run_batch([_request()])[0]
 
-        self.assertEqual(result.metadata["autonomy_rate"], 0.0)
+        self.assertEqual(result.metadata["message_action_autonomy_rate"], 0.0)
 
-    def test_autonomy_rate_is_partial_when_model_supplies_some_required_outputs(self):
+    def test_message_action_autonomy_rate_is_partial_when_model_supplies_some_required_outputs(self):
         def transport(url, headers, payload, timeout):
             return {
                 "choices": [
@@ -527,7 +527,28 @@ class AittaBackendTests(unittest.TestCase):
         # model supplied the message but not the required update_summary action
         self.assertEqual(result.metadata["policy_guard_added_messages"], 0)
         self.assertEqual(result.metadata["policy_guard_added_actions"], 1)
-        self.assertEqual(result.metadata["autonomy_rate"], 0.5)
+        self.assertEqual(result.metadata["message_action_autonomy_rate"], 0.5)
+
+    def test_message_action_autonomy_rate_is_unavailable_for_empty_commit(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+        # "observer" has no requirements in any scenario's role policy, and the model
+        # proposes nothing -- zero committed message/action atoms, the genuine empty case.
+        request = _role_request("storm", "observer", {"severity": 1})
+
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(len(result.outgoing_messages), 0)
+        self.assertEqual(len(result.environment_actions), 0)
+        self.assertIsNone(result.metadata["message_action_autonomy_rate"])
+        self.assertEqual(result.metadata["message_action_committed_atom_count"], 0)
 
     def test_validation_result_and_receipt_match_flat_metadata_for_autonomous_proposal(self):
         def transport(url, headers, payload, timeout):
@@ -565,7 +586,9 @@ class AittaBackendTests(unittest.TestCase):
 
         vr = result.metadata["validation_result"]
         self.assertEqual(vr["semantic_valid"], result.metadata["semantic_valid"])
-        self.assertEqual(vr["autonomy_rate"], result.metadata["autonomy_rate"])
+        self.assertEqual(
+            vr["message_action_autonomy_rate"], result.metadata["message_action_autonomy_rate"]
+        )
         self.assertEqual(vr["useful_step"], result.metadata["useful_step"])
         self.assertEqual(vr["violation_reasons"], [])
         self.assertFalse(vr["model_output_invalid"])

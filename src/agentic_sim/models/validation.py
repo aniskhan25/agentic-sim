@@ -26,5 +26,6 @@ class ValidationResult:
     state_mutation_provenance: dict[str, str] = field(default_factory=dict)
     policy_guard_added_messages: int = 0
     policy_guard_added_actions: int = 0
-    autonomy_rate: float = 1.0
+    message_action_autonomy_rate: float | None = None
+    message_action_committed_atom_count: int = 0
     useful_step: bool = True

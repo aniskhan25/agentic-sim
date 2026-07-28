@@ -226,7 +226,10 @@ class AittaExecutionBackend:
         metadata["policy_guard_added_actions"] = added_actions
 
         total_final = kept_count + added_messages + added_actions
-        metadata["autonomy_rate"] = round(kept_count / total_final, 6) if total_final else 1.0
+        metadata["message_action_committed_atom_count"] = total_final
+        metadata["message_action_autonomy_rate"] = (
+            round(kept_count / total_final, 6) if total_final else None
+        )
 
         final_violations = role_policy.semantic_violations(request, messages, actions, policy)
         final_bounded_violations = role_policy.enforce_bounded(actions)[1]
@@ -263,7 +266,8 @@ class AittaExecutionBackend:
             state_mutation_provenance=state_mutation_provenance,
             policy_guard_added_messages=added_messages,
             policy_guard_added_actions=added_actions,
-            autonomy_rate=metadata["autonomy_rate"],
+            message_action_autonomy_rate=metadata["message_action_autonomy_rate"],
+            message_action_committed_atom_count=metadata["message_action_committed_atom_count"],
             useful_step=metadata["useful_step"],
         )
         metadata["validation_result"] = to_jsonable(validation_result)

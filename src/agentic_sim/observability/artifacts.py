@@ -105,10 +105,10 @@ def aggregate_run_stats(root_dir: str | Path, output_path: str | Path | None = N
             for run in runs
             if run["backend_metrics"].get("latency_seconds", {}).get("avg") is not None
         ]
-        autonomy_means = [
-            run["backend_metrics"].get("autonomy_rate", {}).get("avg")
+        message_action_autonomy_means = [
+            run["backend_metrics"].get("message_action_autonomy_rate", {}).get("avg")
             for run in runs
-            if run["backend_metrics"].get("autonomy_rate", {}).get("avg") is not None
+            if run["backend_metrics"].get("message_action_autonomy_rate", {}).get("avg") is not None
         ]
         useful_throughputs = [
             run["backend_metrics"].get("useful_agent_steps_per_second")
@@ -128,8 +128,11 @@ def aggregate_run_stats(root_dir: str | Path, output_path: str | Path | None = N
                 "cardinality_violation_rate": rate_stats(runs, "cardinality_violations"),
                 "state_mutation_violation_rate": rate_stats(runs, "state_mutation_violations"),
                 "semantic_valid_rate": rate_stats(runs, "semantic_valid_count"),
+                "message_action_autonomy_unavailable_rate": rate_stats(
+                    runs, "message_action_autonomy_unavailable_steps"
+                ),
                 "latency_seconds_mean": _mean_stdev(latency_means),
-                "autonomy_rate_mean": _mean_stdev(autonomy_means),
+                "message_action_autonomy_rate_mean": _mean_stdev(message_action_autonomy_means),
                 "useful_agent_steps_per_second_mean": _mean_stdev(useful_throughputs),
                 "runs": [run["run_dir"] for run in runs],
             }
@@ -194,7 +197,8 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
     state_mutation_violations = 0
     semantic_valid_count = 0
     useful_steps = 0
-    autonomy_rates: list[float] = []
+    message_action_autonomy_rates: list[float] = []
+    message_action_autonomy_unavailable_steps = 0
     backend_steps = 0
     backend_execution_wall_seconds = 0.0
 
@@ -229,9 +233,12 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
             semantic_valid_count += 1
         if metadata.get("useful_step"):
             useful_steps += 1
-        autonomy_rate = metadata.get("autonomy_rate")
-        if isinstance(autonomy_rate, (int, float)):
-            autonomy_rates.append(float(autonomy_rate))
+        if "message_action_autonomy_rate" in metadata:
+            message_action_autonomy_rate = metadata["message_action_autonomy_rate"]
+            if isinstance(message_action_autonomy_rate, (int, float)):
+                message_action_autonomy_rates.append(float(message_action_autonomy_rate))
+            elif message_action_autonomy_rate is None:
+                message_action_autonomy_unavailable_steps += 1
 
     useful_agent_steps_per_second = (
         round(useful_steps / backend_execution_wall_seconds, 6)
@@ -257,12 +264,15 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
         "cardinality_violations": cardinality_violations,
         "state_mutation_violations": state_mutation_violations,
         "semantic_valid_count": semantic_valid_count,
-        "autonomy_rate": {
-            "count": len(autonomy_rates),
-            "min": min(autonomy_rates) if autonomy_rates else None,
-            "max": max(autonomy_rates) if autonomy_rates else None,
-            "avg": round(sum(autonomy_rates) / len(autonomy_rates), 6) if autonomy_rates else None,
+        "message_action_autonomy_rate": {
+            "count": len(message_action_autonomy_rates),
+            "min": min(message_action_autonomy_rates) if message_action_autonomy_rates else None,
+            "max": max(message_action_autonomy_rates) if message_action_autonomy_rates else None,
+            "avg": round(sum(message_action_autonomy_rates) / len(message_action_autonomy_rates), 6)
+            if message_action_autonomy_rates
+            else None,
         },
+        "message_action_autonomy_unavailable_steps": message_action_autonomy_unavailable_steps,
         "useful_steps": useful_steps,
         "backend_execution_wall_seconds": round(backend_execution_wall_seconds, 6),
         "useful_agent_steps_per_second": useful_agent_steps_per_second,
