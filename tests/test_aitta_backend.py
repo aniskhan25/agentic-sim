@@ -654,6 +654,196 @@ class AittaBackendTests(unittest.TestCase):
         self.assertTrue(result.proposal.is_valid)
         self.assertEqual(result.proposal.current_goal, "coordinate")
 
+    def test_bounded_violation_drops_out_of_range_delta(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "environment_actions": [
+                                        {
+                                            "action_type": "adjust_inventory",
+                                            "payload": {"region": "helsinki", "delta": 50000},
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        request = _role_request("supply_chain", "supplier", {"risk_level": "normal"})
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(result.metadata["bounded_violations"], 1)
+        self.assertFalse(any(a.action_type == "adjust_inventory" for a in result.environment_actions))
+        # a cleanly-stripped violation leaves the final result clean, same precedent as must_not
+        self.assertTrue(result.metadata["useful_step"])
+
+    def test_cardinality_violation_dedupes_duplicate_action(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "environment_actions": [
+                                        {
+                                            "action_type": "adjust_inventory",
+                                            "payload": {"region": "helsinki", "delta": 10},
+                                        },
+                                        {
+                                            "action_type": "adjust_inventory",
+                                            "payload": {"region": "helsinki", "delta": 10},
+                                        },
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        request = _role_request("supply_chain", "supplier", {"risk_level": "normal"})
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(result.metadata["cardinality_violations"], 1)
+        self.assertEqual(
+            sum(1 for a in result.environment_actions if a.action_type == "adjust_inventory"), 1
+        )
+        self.assertTrue(result.metadata["useful_step"])
+
+    def test_cardinality_violation_dedupes_duplicate_message(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_coordinator",
+                                            "message_type": "status_update",
+                                            "payload": {},
+                                        },
+                                        {
+                                            "recipient_id": "agent_coordinator",
+                                            "message_type": "status_update",
+                                            "payload": {},
+                                        },
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        request = _role_request("storm", "hospital", {"severity": 1})
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(result.metadata["cardinality_violations"], 1)
+        self.assertEqual(len(result.outgoing_messages), 1)
+        self.assertTrue(result.metadata["useful_step"])
+
+    def test_state_mutation_violation_protects_system_managed_keys(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({"working_memory": {"last_event_type": "evil"}})
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+        request = _request()
+
+        result = backend.run_batch([request])[0]
+
+        self.assertEqual(
+            result.updated_state.working_memory["last_event_type"],
+            request.triggering_event.event_type.value,
+        )
+        self.assertEqual(result.metadata["state_mutation_violations"], 1)
+        self.assertEqual(
+            result.metadata["validation_result"]["state_mutation_provenance"]["last_event_type"],
+            "system",
+        )
+        self.assertFalse(result.metadata["useful_step"])
+
+    def test_new_contract_violations_are_zero_for_clean_proposal(self):
+        def transport(url, headers, payload, timeout):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "outgoing_messages": [
+                                        {
+                                            "recipient_id": "agent_hospital",
+                                            "message_type": "status_request",
+                                            "payload": {"severity": 4},
+                                        }
+                                    ],
+                                    "environment_actions": [
+                                        {"action_type": "update_summary", "payload": {"summary": "ok"}}
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertEqual(result.metadata["bounded_violations"], 0)
+        self.assertEqual(result.metadata["cardinality_violations"], 0)
+        self.assertEqual(result.metadata["state_mutation_violations"], 0)
+        self.assertTrue(result.metadata["useful_step"])
+
     def test_request_prompt_contains_agent_and_role_policy(self):
         """Prompt includes agent context and role_policy; response_shape is omitted to save tokens."""
         captured = []

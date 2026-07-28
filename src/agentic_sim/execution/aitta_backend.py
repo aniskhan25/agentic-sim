@@ -189,7 +189,7 @@ class AittaExecutionBackend:
         json_repair_attempts: int = 0,
         raw_content: str = "",
     ) -> ExecutionResult:
-        state = _updated_state(request, proposal)
+        state, state_mutation_violations, state_mutation_provenance = _updated_state(request, proposal)
         metadata = {
             "backend": self.name,
             "model": self.model_name,
@@ -209,6 +209,15 @@ class AittaExecutionBackend:
 
         messages, actions, must_not_violations = role_policy.enforce_must_not(request, messages, actions, policy)
         metadata["must_not_violations"] = must_not_violations
+
+        actions, bounded_violations = role_policy.enforce_bounded(actions)
+        metadata["bounded_violations"] = bounded_violations
+
+        messages, actions, cardinality_violations = role_policy.enforce_cardinality(request, messages, actions)
+        metadata["cardinality_violations"] = cardinality_violations
+
+        metadata["state_mutation_violations"] = state_mutation_violations
+
         kept_count = len(messages) + len(actions)
 
         messages, added_messages = role_policy.ensure_required_messages(request, messages, policy)
@@ -220,7 +229,14 @@ class AittaExecutionBackend:
         metadata["autonomy_rate"] = round(kept_count / total_final, 6) if total_final else 1.0
 
         final_violations = role_policy.semantic_violations(request, messages, actions, policy)
-        metadata["useful_step"] = not final_violations
+        final_bounded_violations = role_policy.enforce_bounded(actions)[1]
+        final_cardinality_violations = role_policy.enforce_cardinality(request, messages, actions)[2]
+        metadata["useful_step"] = (
+            not final_violations
+            and final_bounded_violations == 0
+            and final_cardinality_violations == 0
+            and state_mutation_violations == 0
+        )
 
         proposal_obj = Proposal(
             raw_content=raw_content,
@@ -241,6 +257,10 @@ class AittaExecutionBackend:
             json_repair_attempts=json_repair_attempts,
             must_not_violations=metadata["must_not_violations"],
             violation_reasons=final_violations,
+            bounded_violations=metadata["bounded_violations"],
+            cardinality_violations=metadata["cardinality_violations"],
+            state_mutation_violations=state_mutation_violations,
+            state_mutation_provenance=state_mutation_provenance,
             policy_guard_added_messages=added_messages,
             policy_guard_added_actions=added_actions,
             autonomy_rate=metadata["autonomy_rate"],
@@ -485,14 +505,34 @@ def _json_object(text: str) -> dict[str, Any]:
     raise last_exc
 
 
-def _updated_state(request: ExecutionRequest, proposal: dict[str, Any]) -> AgentState:
+SYSTEM_MANAGED_WORKING_MEMORY_KEYS = {"last_event_type", "last_environment_tick"}
+
+
+def _updated_state(
+    request: ExecutionRequest, proposal: dict[str, Any]
+) -> tuple[AgentState, int, dict[str, str]]:
     state = request.agent_state.with_activation_count()
+    model_memory = _optional_dict(proposal, "working_memory")
+    violations = sum(1 for key in model_memory if key in SYSTEM_MANAGED_WORKING_MEMORY_KEYS)
+
     memory = dict(state.working_memory)
+    memory.update(
+        {key: value for key, value in model_memory.items() if key not in SYSTEM_MANAGED_WORKING_MEMORY_KEYS}
+    )
+    # system-managed keys are set last so the model can never silently override them
     memory["last_event_type"] = request.triggering_event.event_type.value
     memory["last_environment_tick"] = request.environment.tick
-    memory.update(_optional_dict(proposal, "working_memory"))
+
+    provenance = {
+        key: "model" for key in model_memory if key not in SYSTEM_MANAGED_WORKING_MEMORY_KEYS
+    }
+    provenance["last_event_type"] = "system"
+    provenance["last_environment_tick"] = "system"
+
     current_goal = proposal.get("current_goal")
-    return AgentState(
+    provenance["current_goal"] = "model" if isinstance(current_goal, str) else "unchanged"
+
+    new_state = AgentState(
         agent_id=state.agent_id,
         status=AgentStatus.IDLE,
         current_goal=current_goal if isinstance(current_goal, str) else state.current_goal,
@@ -502,6 +542,7 @@ def _updated_state(request: ExecutionRequest, proposal: dict[str, Any]) -> Agent
         last_active_at=utc_now(),
         metrics=state.metrics,
     )
+    return new_state, violations, provenance
 
 
 def _messages(request: ExecutionRequest, value: Any) -> list[Message]:

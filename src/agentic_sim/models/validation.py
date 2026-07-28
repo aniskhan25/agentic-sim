@@ -20,6 +20,10 @@ class ValidationResult:
     json_repair_attempts: int = 0
     must_not_violations: int = 0
     violation_reasons: list[str] = field(default_factory=list)
+    bounded_violations: int = 0
+    cardinality_violations: int = 0
+    state_mutation_violations: int = 0
+    state_mutation_provenance: dict[str, str] = field(default_factory=dict)
     policy_guard_added_messages: int = 0
     policy_guard_added_actions: int = 0
     autonomy_rate: float = 1.0

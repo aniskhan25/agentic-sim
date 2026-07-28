@@ -152,6 +152,67 @@ def semantic_violations(
     return reasons
 
 
+# A sane protective magnitude, not a domain-calibrated limit -- system defaults are
+# delta=15 (adjust_inventory) and delta=5 (adjust_transport_capacity); 1000 is 65-200x
+# those, wide enough to never constrain legitimate behavior, tight enough to reject an
+# obviously corrupt/hallucinated value. Revisit once real magnitude data exists.
+PROTECTIVE_DELTA_BOUND = 1000
+BOUNDED_ACTION_TYPES = {"adjust_inventory", "adjust_transport_capacity"}
+
+
+def enforce_bounded(actions: list[EnvironmentAction]) -> tuple[list[EnvironmentAction], int]:
+    """Strip actions whose payload['delta'] exceeds PROTECTIVE_DELTA_BOUND in magnitude.
+
+    Drops rather than clamps: clamping would fabricate a value the model never
+    proposed, corrupting provenance rather than protecting it (same precedent as
+    enforce_must_not -- strip entirely, let the guard supply a default if required).
+    """
+    kept: list[EnvironmentAction] = []
+    violations = 0
+    for action in actions:
+        if action.action_type in BOUNDED_ACTION_TYPES:
+            delta = action.payload.get("delta")
+            if not isinstance(delta, (int, float)) or abs(delta) > PROTECTIVE_DELTA_BOUND:
+                violations += 1
+                continue
+        kept.append(action)
+    return kept, violations
+
+
+def enforce_cardinality(
+    request: ExecutionRequest,
+    messages: list[Message],
+    actions: list[EnvironmentAction],
+) -> tuple[list[Message], list[EnvironmentAction], int]:
+    """Drop duplicate messages/actions from the model's own proposal, first-occurrence wins.
+
+    Reuses the exact key shapes ensure_required_messages/ensure_required_actions
+    already use internally to decide what to add, applied here to the model's own
+    output instead. `request` is unused today; kept for signature symmetry with
+    enforce_must_not/ensure_required_*.
+    """
+    del request
+    seen_messages: set[tuple[str, MessageType]] = set()
+    kept_messages: list[Message] = []
+    for message in messages:
+        key = (str(message.recipient_id), message.message_type)
+        if key in seen_messages:
+            continue
+        seen_messages.add(key)
+        kept_messages.append(message)
+
+    seen_actions: set[str] = set()
+    kept_actions: list[EnvironmentAction] = []
+    for action in actions:
+        if action.action_type in seen_actions:
+            continue
+        seen_actions.add(action.action_type)
+        kept_actions.append(action)
+
+    dropped = (len(messages) - len(kept_messages)) + (len(actions) - len(kept_actions))
+    return kept_messages, kept_actions, dropped
+
+
 def ensure_required_messages(
     request: ExecutionRequest, messages: list[Message], policy: dict[str, Any]
 ) -> tuple[list[Message], int]:

@@ -124,6 +124,9 @@ def aggregate_run_stats(root_dir: str | Path, output_path: str | Path | None = N
                 "policy_guard_added_message_rate": rate_stats(runs, "policy_guard_added_messages"),
                 "policy_guard_added_action_rate": rate_stats(runs, "policy_guard_added_actions"),
                 "must_not_violation_rate": rate_stats(runs, "must_not_violations"),
+                "bounded_violation_rate": rate_stats(runs, "bounded_violations"),
+                "cardinality_violation_rate": rate_stats(runs, "cardinality_violations"),
+                "state_mutation_violation_rate": rate_stats(runs, "state_mutation_violations"),
                 "semantic_valid_rate": rate_stats(runs, "semantic_valid_count"),
                 "latency_seconds_mean": _mean_stdev(latency_means),
                 "autonomy_rate_mean": _mean_stdev(autonomy_means),
@@ -186,6 +189,9 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
     guard_added_actions = 0
     json_repair_attempts = 0
     must_not_violations = 0
+    bounded_violations = 0
+    cardinality_violations = 0
+    state_mutation_violations = 0
     semantic_valid_count = 0
     useful_steps = 0
     autonomy_rates: list[float] = []
@@ -216,6 +222,9 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
         guard_added_actions += int(metadata.get("policy_guard_added_actions", 0) or 0)
         json_repair_attempts += int(metadata.get("json_repair_attempts", 0) or 0)
         must_not_violations += int(metadata.get("must_not_violations", 0) or 0)
+        bounded_violations += int(metadata.get("bounded_violations", 0) or 0)
+        cardinality_violations += int(metadata.get("cardinality_violations", 0) or 0)
+        state_mutation_violations += int(metadata.get("state_mutation_violations", 0) or 0)
         if metadata.get("semantic_valid"):
             semantic_valid_count += 1
         if metadata.get("useful_step"):
@@ -244,6 +253,9 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
         "policy_guard_added_actions": guard_added_actions,
         "json_repair_attempts": json_repair_attempts,
         "must_not_violations": must_not_violations,
+        "bounded_violations": bounded_violations,
+        "cardinality_violations": cardinality_violations,
+        "state_mutation_violations": state_mutation_violations,
         "semantic_valid_count": semantic_valid_count,
         "autonomy_rate": {
             "count": len(autonomy_rates),
