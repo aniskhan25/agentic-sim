@@ -1,5 +1,5 @@
 {
-  "repository_revision": "0e52e6428ced5954451613694567dfe3a4939b17",
+  "repository_revision": "dd655fe3374b61ea1aa225d929bc9b36c63d8e68",
   "package_version": "0.1.0",
   "reference_execution_policy": "sequential FIFO (FIFOScheduler) \u2014 the only scheduling policy implemented; no concurrency exists yet",
   "test_inventory": {
