@@ -1,0 +1,209 @@
+{
+  "repository_revision": "0e52e6428ced5954451613694567dfe3a4939b17",
+  "package_version": "0.1.0",
+  "reference_execution_policy": "sequential FIFO (FIFOScheduler) \u2014 the only scheduling policy implemented; no concurrency exists yet",
+  "test_inventory": {
+    "command": "pytest tests/",
+    "count": 111,
+    "files": [
+      "test_aggregate_stats.py",
+      "test_aitta_backend.py",
+      "test_backend_metrics.py",
+      "test_cli.py",
+      "test_config.py",
+      "test_engine.py",
+      "test_env.py",
+      "test_fixtures.py",
+      "test_models.py",
+      "test_replay.py",
+      "test_scheduler.py",
+      "test_state_store.py",
+      "test_storm_scenario.py",
+      "test_supply_chain_scenario.py",
+      "test_sweep.py"
+    ]
+  },
+  "baseline_configs": {
+    "storm": {
+      "path": "configs/storm_small.json",
+      "sha256": "547b3308675372afd06254b611892d1b9ec3d46aae3a97d693096e79f5a22192"
+    },
+    "storm_fixture": {
+      "path": "configs/storm_fixture.json",
+      "sha256": "aa711e0e2405a4d7cc223eaffaef3d8c4adca01452263617f7ed3cd9bb1264ff"
+    },
+    "supply_chain": {
+      "path": "configs/supply_chain_small.json",
+      "sha256": "ccd52b7fb5c9bbab40b795605c1cf3b24545b87052c283484eae4305c3e9631"
+    },
+    "supply_chain_fixture": {
+      "path": "configs/supply_chain_fixture.json",
+      "sha256": "1374deb95c37104e6777d08a93a27502eef7c1b9951ffb80ff53795a51abd93"
+    }
+  },
+  "behavior_signatures": {
+    "storm": {
+      "ticks": [
+        {
+          "tick": 1,
+          "processed_events": 1,
+          "activations": 4,
+          "messages_emitted": 4,
+          "traces_written": 5
+        },
+        {
+          "tick": 1,
+          "processed_events": 4,
+          "activations": 3,
+          "messages_emitted": 2,
+          "traces_written": 4
+        },
+        {
+          "tick": 1,
+          "processed_events": 2,
+          "activations": 1,
+          "messages_emitted": 0,
+          "traces_written": 2
+        },
+        {
+          "tick": 2,
+          "processed_events": 2,
+          "activations": 4,
+          "messages_emitted": 3,
+          "traces_written": 5
+        },
+        {
+          "tick": 2,
+          "processed_events": 3,
+          "activations": 2,
+          "messages_emitted": 1,
+          "traces_written": 3
+        }
+      ],
+      "summary": {
+        "environment_tick": 2,
+        "pending_events": 1,
+        "messages": 10,
+        "traces": 19,
+        "agent_activations": {
+          "agent_coordinator": 5,
+          "agent_hospital": 3,
+          "agent_utility": 4,
+          "agent_forecaster": 2
+        }
+      },
+      "trace_events": [
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "agent_step",
+        "simulation_tick"
+      ],
+      "final_severity": 3
+    },
+    "supply_chain": {
+      "ticks": [
+        {
+          "tick": 1,
+          "processed_events": 1,
+          "activations": 5,
+          "messages_emitted": 8,
+          "traces_written": 6
+        },
+        {
+          "tick": 1,
+          "processed_events": 8,
+          "activations": 5,
+          "messages_emitted": 4,
+          "traces_written": 6
+        },
+        {
+          "tick": 1,
+          "processed_events": 4,
+          "activations": 1,
+          "messages_emitted": 0,
+          "traces_written": 2
+        },
+        {
+          "tick": 2,
+          "processed_events": 1,
+          "activations": 5,
+          "messages_emitted": 8,
+          "traces_written": 6
+        },
+        {
+          "tick": 2,
+          "processed_events": 8,
+          "activations": 5,
+          "messages_emitted": 4,
+          "traces_written": 6
+        }
+      ],
+      "summary": {
+        "environment_tick": 2,
+        "pending_events": 4,
+        "messages": 24,
+        "traces": 26,
+        "agent_activations": {
+          "agent_coordinator": 5,
+          "agent_supplier": 4,
+          "agent_warehouse": 4,
+          "agent_transport": 4,
+          "agent_retailer": 4
+        }
+      },
+      "trace_events": [
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "agent_step",
+        "simulation_tick"
+      ],
+      "final_risk_level": "elevated"
+    }
+  },
+  "reproduction_commands": [
+    "pytest tests/",
+    "agentic-sim run --config configs/storm_small.json --output-dir data/baseline/storm",
+    "agentic-sim run --config configs/supply_chain_small.json --output-dir data/baseline/supply_chain"
+  ],
+  "notes": [
+    "behavior_signatures are produced by create_storm_engine()/create_supply_chain_engine() run for 5 ticks with the mock backend (fully deterministic, no credentials needed) \u2014 see tests/test_replay.py for the exact reproduction code.",
+    "baseline_configs are the canonical small/fast and fixture-driven configs for each scenario; they are not literally the configs used to produce behavior_signatures above (which use the engine factory defaults), but are the configs this baseline freeze designates as the reference entry points for reproducing runs via the CLI."
+  ]
+}

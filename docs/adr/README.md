@@ -19,7 +19,7 @@ Accepted records are changed through a superseding ADR rather than silently rewr
 
 | ID | Decision | Status |
 | --- | --- | --- |
-| 0001 | Observational equivalence, activation identity, execution receipt, and atomic commit | Proposed |
+| 0001 | Observational equivalence, activation identity, execution receipt, and atomic commit | Accepted |
 | 0002 | Runtime-owned provider, store, clock, and telemetry ports | Proposed |
 | 0003 | Causal readiness, conflicts, and permitted concurrency | Proposed |
 | 0004 | Validation, repair, policy-completion, and fallback ordering | Proposed |
