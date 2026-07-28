@@ -11,6 +11,9 @@ from agentic_sim.models import (
     AgentProfile,
     AgentState,
     AgentStatus,
+    CommitReceipt,
+    CommitStatus,
+    CommitUnit,
     EnvironmentState,
     Event,
     EventType,
@@ -78,6 +81,10 @@ class SQLiteStateStore:
                 event_name text not null,
                 payload text not null
             );
+            create table if not exists committed_activations (
+                activation_id text primary key,
+                commit_version_written integer not null
+            );
             """
         )
         self._ensure_event_created_at()
@@ -109,6 +116,7 @@ class SQLiteStateStore:
             delete from messages;
             delete from environment;
             delete from traces;
+            delete from committed_activations;
             """
         )
         self.conn.commit()
@@ -266,6 +274,78 @@ class SQLiteStateStore:
             for row in rows
         ]
 
+    def commit(self, unit: CommitUnit) -> CommitReceipt:
+        with self.conn:
+            existing = self.conn.execute(
+                "select commit_version_written from committed_activations where activation_id = ?",
+                (unit.activation_id,),
+            ).fetchone()
+            if existing is not None:
+                return CommitReceipt(
+                    activation_id=unit.activation_id,
+                    status=CommitStatus.DUPLICATE,
+                    state_version_read=unit.expected_state_version,
+                    commit_version_written=int(existing["commit_version_written"]),
+                )
+
+            row = self.conn.execute(
+                "select payload from agent_states where agent_id = ?", (str(unit.agent_id),)
+            ).fetchone()
+            current_version = (
+                _state_from_dict(json.loads(row["payload"])).version if row is not None else 0
+            )
+            if current_version != unit.expected_state_version:
+                return CommitReceipt(
+                    activation_id=unit.activation_id,
+                    status=CommitStatus.CONFLICT,
+                    state_version_read=unit.expected_state_version,
+                    commit_version_written=None,
+                )
+
+            self.conn.execute(
+                "insert or replace into agent_states(agent_id, payload) values (?, ?)",
+                (str(unit.agent_id), json.dumps(to_jsonable(unit.updated_state))),
+            )
+            for message in unit.outgoing_messages:
+                self.conn.execute(
+                    """
+                    insert or replace into messages(message_id, recipient_id, created_at, priority, payload)
+                    values (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        message.message_id,
+                        str(message.recipient_id),
+                        to_iso(message.created_at),
+                        message.priority,
+                        json.dumps(to_jsonable(message)),
+                    ),
+                )
+            for event in unit.emitted_events:
+                self.conn.execute(
+                    """
+                    insert or replace into events(event_id, scheduled_for, created_at, priority, payload)
+                    values (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event.event_id,
+                        to_iso(event.scheduled_for),
+                        to_iso(event.created_at),
+                        event.priority,
+                        json.dumps(to_jsonable(event)),
+                    ),
+                )
+            self.conn.execute(
+                "insert into committed_activations(activation_id, commit_version_written) values (?, ?)",
+                (unit.activation_id, unit.updated_state.version),
+            )
+
+        return CommitReceipt(
+            activation_id=unit.activation_id,
+            status=CommitStatus.COMMITTED,
+            state_version_read=unit.expected_state_version,
+            commit_version_written=unit.updated_state.version,
+        )
+
 
 def _profile_from_dict(data: dict[str, Any]) -> AgentProfile:
     return AgentProfile(
@@ -289,6 +369,7 @@ def _state_from_dict(data: dict[str, Any]) -> AgentState:
         inbox_cursor=data.get("inbox_cursor"),
         last_active_at=from_iso(data["last_active_at"]) if data.get("last_active_at") else None,
         metrics=dict(data.get("metrics", {})),
+        version=int(data.get("version", 0)),
     )
 
 
@@ -303,6 +384,7 @@ def _event_from_dict(data: dict[str, Any]) -> Event:
         payload=dict(data.get("payload", {})),
         priority=int(data.get("priority", 0)),
         correlation_id=data.get("correlation_id"),
+        causal_parent_activation_id=data.get("causal_parent_activation_id"),
     )
 
 
@@ -316,6 +398,7 @@ def _message_from_dict(data: dict[str, Any]) -> Message:
         created_at=from_iso(data["created_at"]),
         payload=dict(data.get("payload", {})),
         correlation_id=data.get("correlation_id"),
+        origin_activation_id=data.get("origin_activation_id"),
     )
 
 
@@ -325,4 +408,5 @@ def _environment_from_dict(data: dict[str, Any]) -> EnvironmentState:
         tick=int(data["tick"]),
         updated_at=from_iso(data["updated_at"]),
         variables=dict(data.get("variables", {})),
+        version=int(data.get("version", 0)),
     )

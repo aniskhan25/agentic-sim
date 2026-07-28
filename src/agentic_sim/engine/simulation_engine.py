@@ -8,7 +8,7 @@ from agentic_sim.environment.base import Environment
 from agentic_sim.execution import BatchBuilder, ContextBuilder
 from agentic_sim.execution.base import ExecutionBackend
 from agentic_sim.messaging import MessageRouter
-from agentic_sim.models import Event, ExecutionResult, SimulationTickResult
+from agentic_sim.models import CommitUnit, Event, ExecutionResult, SimulationTickResult
 from agentic_sim.observability.base import LocalTelemetry, Telemetry
 from agentic_sim.scheduling import SchedulerInput
 from agentic_sim.scheduling.base import Scheduler
@@ -102,17 +102,29 @@ class SimulationEngine:
         for result in results:
             req = request_by_agent[result.agent_id]
 
+            # message_delivery_ms is routing/derivation only (pure, no I/O) now
+            # that message storage moved inside state_commit_ms's atomic commit.
             started = perf_counter()
-            self.store.agents.put_state(result.updated_state)
-            timings["state_commit_ms"] += _elapsed_ms(started)
-
-            emitted_messages += len(result.outgoing_messages)
-            started = perf_counter()
-            self.router.deliver(result.outgoing_messages, self.store)
+            deliverable_messages, derived_events = self.router.route(
+                result.outgoing_messages, self.store
+            )
             timings["message_delivery_ms"] += _elapsed_ms(started)
 
+            started = perf_counter()
+            receipt = self.store.commit(
+                CommitUnit(
+                    activation_id=req.activation.activation_id,
+                    agent_id=result.agent_id,
+                    expected_state_version=req.agent_state.version,
+                    updated_state=result.updated_state,
+                    outgoing_messages=deliverable_messages,
+                    emitted_events=derived_events + result.emitted_events,
+                )
+            )
+            timings["state_commit_ms"] += _elapsed_ms(started)
+
+            emitted_messages += len(deliverable_messages)
             environment_actions.extend(result.environment_actions)
-            emitted_events.extend(result.emitted_events)
 
             started = perf_counter()
             self.telemetry.record_event(
@@ -123,10 +135,11 @@ class SimulationEngine:
                     "trigger_event_id": req.activation.trigger_event_id,
                     "causal_parents": [req.activation.trigger_event_id]
                     + [str(m.message_id) for m in req.inbox_messages],
-                    "state_version_read": req.agent_state.version,
-                    "commit_version_written": result.updated_state.version,
-                    "outgoing_message_ids": [str(m.message_id) for m in result.outgoing_messages],
-                    "messages": len(result.outgoing_messages),
+                    "state_version_read": receipt.state_version_read,
+                    "commit_version_written": receipt.commit_version_written,
+                    "commit_status": receipt.status.value,
+                    "outgoing_message_ids": [str(m.message_id) for m in deliverable_messages],
+                    "messages": len(deliverable_messages),
                     "environment_actions": len(result.environment_actions),
                     "metadata": result.metadata,
                 },

@@ -1,4 +1,5 @@
 from agentic_sim.models.agent import AgentId, AgentProfile, AgentState, AgentStatus
+from agentic_sim.models.commit import CommitReceipt, CommitStatus, CommitUnit
 from agentic_sim.models.environment import (
     EnvironmentAction,
     EnvironmentState,
@@ -24,6 +25,9 @@ __all__ = [
     "AgentProfile",
     "AgentState",
     "AgentStatus",
+    "CommitReceipt",
+    "CommitStatus",
+    "CommitUnit",
     "EnvironmentAction",
     "EnvironmentState",
     "EnvironmentTransitionResult",

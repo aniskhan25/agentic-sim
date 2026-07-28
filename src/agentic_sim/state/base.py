@@ -7,6 +7,8 @@ from agentic_sim.models import (
     AgentId,
     AgentProfile,
     AgentState,
+    CommitReceipt,
+    CommitUnit,
     EnvironmentState,
     Event,
     Message,
@@ -52,3 +54,5 @@ class RuntimeStore(Protocol):
     messages: MessageStore
     environment: EnvironmentStore
     traces: TraceStore
+
+    def commit(self, unit: CommitUnit) -> CommitReceipt: ...

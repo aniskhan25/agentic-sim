@@ -6,6 +6,9 @@ from agentic_sim.models import (
     AgentId,
     AgentProfile,
     AgentState,
+    CommitReceipt,
+    CommitStatus,
+    CommitUnit,
     EnvironmentState,
     Event,
     Message,
@@ -28,6 +31,7 @@ class InMemoryStateStore:
         self._messages: dict[str, Message] = {}
         self._environment = environment
         self._traces: list[TraceRecord] = []
+        self._committed: dict[str, int] = {}
 
     def get_profile(self, agent_id: AgentId) -> AgentProfile:
         return self._profiles[agent_id]
@@ -91,3 +95,36 @@ class InMemoryStateStore:
 
     def list(self) -> list[TraceRecord]:
         return list(self._traces)
+
+    def commit(self, unit: CommitUnit) -> CommitReceipt:
+        if unit.activation_id in self._committed:
+            return CommitReceipt(
+                activation_id=unit.activation_id,
+                status=CommitStatus.DUPLICATE,
+                state_version_read=unit.expected_state_version,
+                commit_version_written=self._committed[unit.activation_id],
+            )
+
+        current = self._states.get(unit.agent_id)
+        current_version = current.version if current is not None else 0
+        if current_version != unit.expected_state_version:
+            return CommitReceipt(
+                activation_id=unit.activation_id,
+                status=CommitStatus.CONFLICT,
+                state_version_read=unit.expected_state_version,
+                commit_version_written=None,
+            )
+
+        self._states[unit.agent_id] = unit.updated_state
+        for message in unit.outgoing_messages:
+            self.put(message)
+        for event in unit.emitted_events:
+            self.put(event)
+        self._committed[unit.activation_id] = unit.updated_state.version
+
+        return CommitReceipt(
+            activation_id=unit.activation_id,
+            status=CommitStatus.COMMITTED,
+            state_version_read=unit.expected_state_version,
+            commit_version_written=unit.updated_state.version,
+        )

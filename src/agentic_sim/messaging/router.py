@@ -5,15 +5,20 @@ from agentic_sim.state.base import RuntimeStore
 
 
 class MessageRouter:
-    """Stores structured messages and emits delivery events."""
+    """Filters messages to known recipients and derives their delivery events."""
 
-    def deliver(self, messages: list[Message], store: RuntimeStore) -> list[Event]:
-        events: list[Event] = []
+    def route(self, messages: list[Message], store: RuntimeStore) -> tuple[list[Message], list[Event]]:
+        """Pure: does not touch the store. Callers commit the result
+        atomically alongside the sending agent's state (see
+        SimulationEngine.step() and models/commit.py::CommitUnit).
+        """
         known_agents = {str(profile.agent_id) for profile in store.agents.list_profiles()}
+        deliverable: list[Message] = []
+        events: list[Event] = []
         for message in messages:
             if str(message.recipient_id) not in known_agents:
                 continue
-            store.messages.put(message)
+            deliverable.append(message)
             events.append(
                 Event.create(
                     EventType.MESSAGE_ARRIVED,
@@ -29,5 +34,4 @@ class MessageRouter:
                     causal_parent_activation_id=message.origin_activation_id,
                 )
             )
-        store.events.put_many(events)
-        return events
+        return deliverable, events

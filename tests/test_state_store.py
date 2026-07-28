@@ -4,7 +4,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from agentic_sim.environment import StormEnvironment
-from agentic_sim.models import AgentId, AgentProfile, AgentState, Event, EventType
+from agentic_sim.models import (
+    AgentId,
+    AgentProfile,
+    AgentState,
+    EnvironmentState,
+    Event,
+    EventType,
+    Message,
+    MessageType,
+)
 from agentic_sim.state import InMemoryStateStore, SQLiteStateStore
 from agentic_sim.utils.time import utc_now
 
@@ -80,6 +89,41 @@ class StateStoreTests(unittest.TestCase):
                 [event.event_id for event in store.events.pop_ready(utc_now())],
                 ["evt_older", "evt_newer"],
             )
+            store.close()
+
+    def test_sqlite_store_round_trips_version_and_causal_fields(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "state.sqlite"
+            environment = StormEnvironment().initialize()
+            store = SQLiteStateStore(path, environment=environment)
+            agent_id = AgentId("agent_versioned")
+
+            store.agents.put_state(AgentState(agent_id=agent_id, version=7))
+            self.assertEqual(store.agents.get_state(agent_id).version, 7)
+
+            event = Event.create(
+                EventType.MESSAGE_ARRIVED, source="test", causal_parent_activation_id="act_123"
+            )
+            store.events.put(event)
+            popped = store.events.pop_ready(utc_now())
+            self.assertEqual(popped[0].causal_parent_activation_id, "act_123")
+
+            message = Message.create(
+                sender_id=AgentId("a"),
+                recipient_id=AgentId("b"),
+                message_type=MessageType.STATUS_UPDATE,
+                origin_activation_id="act_456",
+            )
+            store.messages.put(message)
+            inbox = store.messages.inbox(AgentId("b"))
+            self.assertEqual(inbox[0].origin_activation_id, "act_456")
+
+            store.environment.put(
+                EnvironmentState(
+                    scenario="storm", tick=1, updated_at=environment.updated_at, variables={}, version=3
+                )
+            )
+            self.assertEqual(store.environment.get().version, 3)
             store.close()
 
     def test_sqlite_store_initialization_starts_fresh_run(self):
