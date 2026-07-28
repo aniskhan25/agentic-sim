@@ -118,3 +118,21 @@ class EngineTests(unittest.TestCase):
         event_names = [trace.event_name for trace in engine.store.traces.list()]
         self.assertIn("agent_step", event_names)
         self.assertIn("simulation_tick", event_names)
+
+    def test_agent_step_trace_carries_causal_and_version_fields(self):
+        engine = create_storm_engine()
+
+        engine.run(1)
+
+        agent_steps = [
+            trace.payload for trace in engine.store.traces.list() if trace.event_name == "agent_step"
+        ]
+        self.assertGreater(len(agent_steps), 0)
+        for payload in agent_steps:
+            self.assertIn("activation_id", payload)
+            self.assertIn("trigger_event_id", payload)
+            self.assertIsInstance(payload["causal_parents"], list)
+            self.assertIn(payload["trigger_event_id"], payload["causal_parents"])
+            self.assertEqual(payload["state_version_read"], 0)
+            self.assertEqual(payload["commit_version_written"], 1)
+            self.assertIsInstance(payload["outgoing_message_ids"], list)

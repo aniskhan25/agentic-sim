@@ -33,6 +33,7 @@ class AgentState:
     inbox_cursor: str | None = None
     last_active_at: datetime | None = None
     metrics: dict[str, int | float] = field(default_factory=dict)
+    version: int = 0
 
     def with_activation_count(self) -> "AgentState":
         metrics = dict(self.metrics)
@@ -46,4 +47,5 @@ class AgentState:
             inbox_cursor=self.inbox_cursor,
             last_active_at=self.last_active_at,
             metrics=metrics,
+            version=self.version + 1,
         )

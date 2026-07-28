@@ -651,9 +651,11 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(receipt["provider"], "aitta")
         self.assertEqual(receipt["model"], "demo/model")
         self.assertEqual(receipt["commit_status"], "proposed")
-        # unmeasurable fields must stay None, never a fake placeholder
-        self.assertIsNone(receipt["state_version_read"])
-        self.assertIsNone(receipt["commit_version_written"])
+        # causal/version data is now real (item 8), not a placeholder
+        self.assertEqual(receipt["state_version_read"], 0)
+        self.assertEqual(receipt["commit_version_written"], 1)
+        self.assertEqual(receipt["causal_parents"], [request.activation.trigger_event_id])
+        # fields with no data source yet must stay None, never a fake placeholder
         self.assertIsNone(receipt["request_hash"])
         self.assertIsNone(receipt["dispatch_seconds"])
         self.assertIsNone(receipt["accelerator"])

@@ -56,6 +56,7 @@ class MockExecutionBackend:
             inbox_cursor=request.inbox_messages[-1].message_id if request.inbox_messages else state.inbox_cursor,
             last_active_at=utc_now(),
             metrics=state.metrics,
+            version=state.version,
         )
 
     def _coordinator_result(
@@ -71,6 +72,7 @@ class MockExecutionBackend:
                     priority=request.triggering_event.priority,
                     payload={"severity": request.environment.variables.get("severity", 0)},
                     correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
+                    origin_activation_id=request.activation.activation_id,
                 )
             )
 
@@ -106,6 +108,7 @@ class MockExecutionBackend:
                 "severity": severity,
             },
             correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
+            origin_activation_id=request.activation.activation_id,
         )
         return ExecutionResult(
             agent_id=request.agent_profile.agent_id,

@@ -84,6 +84,7 @@ class SupplyChainEnvironment:
                 tick=state.tick,
                 updated_at=utc_now(),
                 variables=variables,
+                version=state.version + 1,
             ),
             emitted_events=emitted,
         )
@@ -127,6 +128,7 @@ class SupplyChainEnvironment:
             tick=state.tick + 1,
             updated_at=now,
             variables=variables,
+            version=state.version + 1,
         )
         payload = {
             "demand": demand,

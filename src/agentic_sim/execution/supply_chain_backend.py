@@ -44,6 +44,7 @@ class SupplyChainRuleBackend(MockExecutionBackend):
                 },
                 correlation_id=request.triggering_event.correlation_id
                 or request.triggering_event.event_id,
+                origin_activation_id=request.activation.activation_id,
             )
             for agent_id in request.triggering_event.payload.get("operator_ids", [])
         ]
@@ -86,6 +87,7 @@ class SupplyChainRuleBackend(MockExecutionBackend):
                 "risk_level": risk_level,
             },
             correlation_id=request.triggering_event.correlation_id or request.triggering_event.event_id,
+            origin_activation_id=request.activation.activation_id,
         )
         return ExecutionResult(
             agent_id=request.agent_profile.agent_id,

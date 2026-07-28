@@ -26,6 +26,7 @@ class MessageRouter:
                     },
                     priority=message.priority,
                     correlation_id=message.correlation_id or message.message_id,
+                    causal_parent_activation_id=message.origin_activation_id,
                 )
             )
         store.events.put_many(events)

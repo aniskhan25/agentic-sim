@@ -10,6 +10,7 @@ from typing import Any
 
 from agentic_sim.config import RuntimeConfig
 from agentic_sim.models import SimulationTickResult
+from agentic_sim.observability.causal_verifier import verify as verify_causal_graph
 from agentic_sim.observability.summaries import RunSummary
 from agentic_sim.state.base import RuntimeStore
 from agentic_sim.utils.ids import new_id
@@ -38,6 +39,7 @@ def write_run_artifacts(
         "environment": path / "environment.json",
         "traces": path / "traces.json",
         "backend_metrics": path / "backend_metrics.json",
+        "causal_verification": path / "causal_verification.json",
     }
     _write_json(files["metadata"], metadata)
     _write_json(files["config"], _config_snapshot(config))
@@ -46,6 +48,7 @@ def write_run_artifacts(
     _write_json(files["environment"], to_jsonable(store.environment.get()))
     _write_json(files["traces"], [to_jsonable(trace) for trace in traces])
     _write_json(files["backend_metrics"], _backend_metrics(traces))
+    _write_json(files["causal_verification"], to_jsonable(verify_causal_graph(traces)))
     return {"run_id": metadata["run_id"], "output_dir": str(path)}
 
 

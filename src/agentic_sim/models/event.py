@@ -29,6 +29,7 @@ class Event:
     payload: dict[str, Any] = field(default_factory=dict)
     priority: int = 0
     correlation_id: str | None = None
+    causal_parent_activation_id: str | None = None
 
     @classmethod
     def create(
@@ -41,6 +42,7 @@ class Event:
         priority: int = 0,
         scheduled_for: datetime | None = None,
         correlation_id: str | None = None,
+        causal_parent_activation_id: str | None = None,
     ) -> "Event":
         now = utc_now()
         return cls(
@@ -53,4 +55,5 @@ class Event:
             payload=payload or {},
             priority=priority,
             correlation_id=correlation_id,
+            causal_parent_activation_id=causal_parent_activation_id,
         )

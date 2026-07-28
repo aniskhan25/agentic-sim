@@ -286,6 +286,10 @@ class AittaExecutionBackend:
             fallback_used=_is_invalid(proposal),
             commit_status="proposed",
             error_reason=proposal.get("metadata", {}).get("model_output_error"),
+            causal_parents=[request.activation.trigger_event_id]
+            + [str(m.message_id) for m in request.inbox_messages],
+            state_version_read=request.agent_state.version,
+            commit_version_written=state.version,
         )
         metadata["execution_receipt"] = to_jsonable(receipt)
 
@@ -545,6 +549,7 @@ def _updated_state(
         inbox_cursor=request.inbox_messages[-1].message_id if request.inbox_messages else state.inbox_cursor,
         last_active_at=utc_now(),
         metrics=state.metrics,
+        version=state.version,
     )
     return new_state, violations, provenance
 
@@ -570,6 +575,7 @@ def _messages(request: ExecutionRequest, value: Any) -> list[Message]:
                 correlation_id=item.get("correlation_id")
                 or request.triggering_event.correlation_id
                 or request.triggering_event.event_id,
+                origin_activation_id=request.activation.activation_id,
             )
         )
     return messages
@@ -612,6 +618,7 @@ def _events(request: ExecutionRequest, value: Any) -> list[Event]:
                 correlation_id=item.get("correlation_id")
                 or request.triggering_event.correlation_id
                 or request.triggering_event.event_id,
+                causal_parent_activation_id=request.activation.activation_id,
             )
         )
     return events

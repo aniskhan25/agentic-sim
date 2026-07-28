@@ -67,6 +67,7 @@ class StormEnvironment:
                 tick=state.tick,
                 updated_at=utc_now(),
                 variables=variables,
+                version=state.version + 1,
             ),
             emitted_events=emitted,
         )
@@ -88,6 +89,7 @@ class StormEnvironment:
             tick=state.tick + 1,
             updated_at=now,
             variables=variables,
+            version=state.version + 1,
         )
         event = Event.create(
             EventType.ENVIRONMENT_UPDATE,

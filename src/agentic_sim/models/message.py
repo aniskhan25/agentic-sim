@@ -27,6 +27,7 @@ class Message:
     created_at: datetime
     payload: dict[str, Any] = field(default_factory=dict)
     correlation_id: str | None = None
+    origin_activation_id: str | None = None
 
     @classmethod
     def create(
@@ -38,6 +39,7 @@ class Message:
         payload: dict[str, Any] | None = None,
         priority: int = 0,
         correlation_id: str | None = None,
+        origin_activation_id: str | None = None,
     ) -> "Message":
         return cls(
             message_id=new_id("msg"),
@@ -48,4 +50,5 @@ class Message:
             created_at=utc_now(),
             payload=payload or {},
             correlation_id=correlation_id,
+            origin_activation_id=origin_activation_id,
         )

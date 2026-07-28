@@ -77,6 +77,9 @@ class SimulationEngine:
             for activation in activations
             if activation.trigger_event_id in event_by_id
         ]
+        # FIFOScheduler guarantees at most one activation per agent per tick, so this
+        # pairing is unambiguous.
+        request_by_agent = {request.activation.agent_id: request for request in requests}
         timings["context_building_ms"] = _elapsed_ms(started)
 
         started = perf_counter()
@@ -95,6 +98,7 @@ class SimulationEngine:
 
         started = perf_counter()
         for result in results:
+            req = request_by_agent[result.agent_id]
             self.store.agents.put_state(result.updated_state)
             emitted_messages += len(result.outgoing_messages)
             self.router.deliver(result.outgoing_messages, self.store)
@@ -104,6 +108,13 @@ class SimulationEngine:
                 event_name="agent_step",
                 payload={
                     "agent_id": str(result.agent_id),
+                    "activation_id": req.activation.activation_id,
+                    "trigger_event_id": req.activation.trigger_event_id,
+                    "causal_parents": [req.activation.trigger_event_id]
+                    + [str(m.message_id) for m in req.inbox_messages],
+                    "state_version_read": req.agent_state.version,
+                    "commit_version_written": result.updated_state.version,
+                    "outgoing_message_ids": [str(m.message_id) for m in result.outgoing_messages],
                     "messages": len(result.outgoing_messages),
                     "environment_actions": len(result.environment_actions),
                     "metadata": result.metadata,

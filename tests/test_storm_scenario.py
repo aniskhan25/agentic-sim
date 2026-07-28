@@ -27,3 +27,14 @@ class StormScenarioTests(unittest.TestCase):
 
         event_types = [event.event_type for event in second.emitted_events]
         self.assertIn(EventType.STORM_OUTAGE, event_types)
+
+    def test_tick_and_apply_actions_increment_environment_version(self):
+        environment = StormEnvironment()
+        state = environment.initialize()
+        self.assertEqual(state.version, 0)
+
+        ticked = environment.tick(state, utc_now())
+        self.assertEqual(ticked.state.version, 1)
+
+        acted = environment.apply_actions(ticked.state, [])
+        self.assertEqual(acted.state.version, 2)

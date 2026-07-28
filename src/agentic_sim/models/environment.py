@@ -11,6 +11,7 @@ class EnvironmentState:
     tick: int
     updated_at: datetime
     variables: dict[str, Any] = field(default_factory=dict)
+    version: int = 0
 
 
 @dataclass(slots=True)

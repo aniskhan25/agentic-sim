@@ -54,6 +54,16 @@ class ModelTests(unittest.TestCase):
         )
         self.assertEqual(retried.attempt_number, 2)
 
+    def test_agent_state_with_activation_count_increments_version(self):
+        state = AgentState(agent_id=AgentId("agent_1"))
+        self.assertEqual(state.version, 0)
+
+        once = state.with_activation_count()
+        self.assertEqual(once.version, 1)
+
+        twice = once.with_activation_count()
+        self.assertEqual(twice.version, 2)
+
     def test_proposal_defaults_and_jsonable(self):
         proposal = Proposal(raw_content="{}")
 
