@@ -125,6 +125,22 @@ The composition root may know concrete scenarios and adapters. Runtime policy de
 
 These rules are enforced through automated dependency checks, adapter conformance suites, architectural tests, and decision records.
 
+## Current-Layout Dependency Mapping
+
+The package layout above (`domain/runtime/ports/adapters/scenarios`) is the target; no top-level package rewrite has happened yet, and none is scoped until a later phase. This section maps the target's abstract layer names onto where they actually live today, so "the dependency rule" is checkable now rather than only meaningful after a future migration.
+
+| Target layer | Current location |
+| --- | --- |
+| domain | `models/`, `utils/` |
+| ports | the `Protocol` classes in `execution/base.py`, `state/base.py`, `engine/clock.py`, `observability/base.py`, `scheduling/base.py`, `environment/base.py` |
+| adapters | their concrete implementations: `execution/aitta_backend.py`, `mock_backend.py`, `supply_chain_backend.py`; `state/sqlite_store.py`, `in_memory_store.py`; `observability/base.py`'s `LocalTelemetry` |
+| runtime | `engine/` |
+| composition root (target) | `cli.py` |
+
+**Enforced today:** domain packages (`models/`, `utils/`) never import from any outer-layer package. Checked automatically by `tests/test_architecture_boundaries.py`, which parses every `.py` file under both packages via `ast` and fails if any import resolves to an outer-layer prefix. `engine/simulation_engine.py` already imports only ports (`ExecutionBackend`, `RuntimeStore`, `Clock`, `Telemetry`) plus the one default adapter meant to be constructed at that layer (`LocalTelemetry`), never a concrete backend by name — compliant with the target rule already, just not yet organized under a literal `ports/` directory.
+
+**Known, deliberately unfixed deviation:** `scenarios/storm.py` and `scenarios/supply_chain.py` currently import `execution.create_execution_backend` and `state.InMemoryStateStore`/`SQLiteStateStore` directly — selecting concrete adapters themselves, which Architectural Rule 1 assigns to the composition root instead. This is existing, tested, working code. Fixing it means threading adapter selection through `cli.py`, which is a real behavior-preserving refactor, not a lightweight check — deferred to the eventual full package migration rather than patched as a side effect of adding this check.
+
 ## Change-Isolation Requirements
 
 The architecture must support:
