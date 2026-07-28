@@ -500,7 +500,7 @@ Execute the next cycle in this order:
 
 1. ~~Freeze baseline artifacts, terminology, test inventory, and performance signatures.~~ **Done** — `docs/baseline/manifest.json` (repository revision, test inventory, config hashes, storm and supply-chain behavior signatures, reproduction commands) and `docs/glossary.md` (event, activation, proposal, validated result, commit, policy completion, fallback, useful agent step).
 2. ~~Write and accept ADR 0001 for observational equivalence, activation identity, receipt ownership, and atomic commit.~~ **Done** — `docs/adr/0001-observational-semantics-and-commit.md`, status `Accepted`.
-3. Define proposal, validation result, activation, receipt, and platform-manifest types.
+3. ~~Define proposal, validation result, activation, receipt, and platform-manifest types.~~ **Done** — `models/proposal.py`, `validation.py`, `receipt.py`, `platform_manifest.py`, `Activation.attempt_number`, `execution/capabilities.py`, wired additively into `AittaExecutionBackend._result_from_proposal`.
 4. Define narrow execution, store, clock, and telemetry ports.
 5. Record the target dependency rule and add lightweight automated boundary checks.
 6. Complete provider-neutral contract schemas and per-atom provenance for messages, environment actions, and state mutations.
