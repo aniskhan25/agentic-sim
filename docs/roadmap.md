@@ -4,6 +4,8 @@ This document describes what the demonstrator already shows, what remains to com
 
 The goal is narrow and concrete: show that LUMI can run multi-agent LLM workflows with real simulation semantics — event-driven coordination, role-differentiated agents, structured messaging, persistent traces, and parameter sweeps across SLURM jobs. This is a demonstrator, not a research prototype or production system.
 
+The infrastructure-agnostic transition from this demonstrator to a research system is defined separately in [research_roadmap.md](research_roadmap.md).
+
 ## What this demonstrator already shows
 
 **1. Event-driven multi-agent simulation loop.** A `SimulationEngine` tick loop pops ready events, schedules agent activations by role and priority, builds execution requests, runs them through a backend, persists state and messages, and writes structured traces. The loop is inspectable, testable, and produces reproducible output.

@@ -228,7 +228,11 @@ Additional docs:
 - [docs/scenario_storm.md](docs/scenario_storm.md): storm scenario details.
 - [docs/scenario_supply_chain.md](docs/scenario_supply_chain.md): supply-chain scenario details.
 - [docs/lumi.md](docs/lumi.md): LUMI batch runs.
-- [docs/roadmap.md](docs/roadmap.md): next and future implementation plan.
+- [docs/roadmap.md](docs/roadmap.md): completed demonstrator milestones and future additions.
+- [docs/research_roadmap.md](docs/research_roadmap.md): infrastructure-agnostic research plan for portable causal execution.
+- [docs/target_architecture.md](docs/target_architecture.md): canonical component boundaries, observational semantics, and atomic commit design.
+- [docs/evaluation_plan.md](docs/evaluation_plan.md): controlled LUMI/Roihu workloads, metrics, hypotheses, and comparison methodology.
+- [docs/adr/](docs/adr/): binding architecture decision records.
 - [docs/amd_vllm_lumi_tuning.md](docs/amd_vllm_lumi_tuning.md): future AMD/vLLM throughput knobs.
 
 The engine treats reasoning as a pluggable backend behind a stable execution contract. That keeps the simulation inspectable and lets model serving be added later without changing the core loop.
