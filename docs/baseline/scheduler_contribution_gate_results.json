@@ -1,0 +1,244 @@
+{
+  "min_relative_improvement": 0.15,
+  "heterogeneity_bearing_variants": [
+    "multi_provider",
+    "multi_role_multi_provider"
+  ],
+  "primary_contrast": [
+    "full",
+    "causal_only"
+  ],
+  "variants": [
+    {
+      "variant": "single_provider",
+      "request_count": 6,
+      "repeats": 10,
+      "throughput_requests_per_second": {
+        "sequential": {
+          "count": 10,
+          "mean": 82.136,
+          "stdev": 2.554,
+          "ci95": [
+            80.553,
+            83.719
+          ]
+        },
+        "naive_concurrent": {
+          "count": 10,
+          "mean": 447.672,
+          "stdev": 20.918,
+          "ci95": [
+            434.707,
+            460.637
+          ]
+        },
+        "barrier": {
+          "count": 10,
+          "mean": 429.65,
+          "stdev": 14.868,
+          "ci95": [
+            420.434,
+            438.865
+          ]
+        },
+        "causal_only": {
+          "count": 10,
+          "mean": 419.212,
+          "stdev": 8.796,
+          "ci95": [
+            413.759,
+            424.664
+          ]
+        },
+        "capability_aware": {
+          "count": 10,
+          "mean": 430.499,
+          "stdev": 13.076,
+          "ci95": [
+            422.394,
+            438.604
+          ]
+        },
+        "queue_aware": {
+          "count": 10,
+          "mean": 161.223,
+          "stdev": 6.843,
+          "ci95": [
+            156.981,
+            165.464
+          ]
+        },
+        "full": {
+          "count": 10,
+          "mean": 157.899,
+          "stdev": 3.782,
+          "ci95": [
+            155.555,
+            160.243
+          ]
+        }
+      },
+      "gate": {
+        "applicable": false,
+        "cleared": true,
+        "reason": "control variant -- no heterogeneity for any rung to exploit, no effect required"
+      }
+    },
+    {
+      "variant": "multi_provider",
+      "request_count": 12,
+      "repeats": 10,
+      "throughput_requests_per_second": {
+        "sequential": {
+          "count": 10,
+          "mean": 82.045,
+          "stdev": 1.508,
+          "ci95": [
+            81.111,
+            82.98
+          ]
+        },
+        "naive_concurrent": {
+          "count": 10,
+          "mean": 463.616,
+          "stdev": 17.035,
+          "ci95": [
+            453.058,
+            474.175
+          ]
+        },
+        "barrier": {
+          "count": 10,
+          "mean": 298.321,
+          "stdev": 11.286,
+          "ci95": [
+            291.325,
+            305.316
+          ]
+        },
+        "causal_only": {
+          "count": 10,
+          "mean": 461.052,
+          "stdev": 11.806,
+          "ci95": [
+            453.735,
+            468.37
+          ]
+        },
+        "capability_aware": {
+          "count": 10,
+          "mean": 291.956,
+          "stdev": 10.284,
+          "ci95": [
+            285.582,
+            298.33
+          ]
+        },
+        "queue_aware": {
+          "count": 10,
+          "mean": 158.352,
+          "stdev": 2.787,
+          "ci95": [
+            156.625,
+            160.079
+          ]
+        },
+        "full": {
+          "count": 10,
+          "mean": 158.201,
+          "stdev": 4.547,
+          "ci95": [
+            155.383,
+            161.019
+          ]
+        }
+      },
+      "gate": {
+        "applicable": true,
+        "cleared": false,
+        "relative_improvement": -0.6569,
+        "effect_size_ok": false,
+        "bands_separated": false
+      }
+    },
+    {
+      "variant": "multi_role_multi_provider",
+      "request_count": 18,
+      "repeats": 10,
+      "throughput_requests_per_second": {
+        "sequential": {
+          "count": 10,
+          "mean": 82.379,
+          "stdev": 0.897,
+          "ci95": [
+            81.823,
+            82.935
+          ]
+        },
+        "naive_concurrent": {
+          "count": 10,
+          "mean": 475.981,
+          "stdev": 14.33,
+          "ci95": [
+            467.099,
+            484.863
+          ]
+        },
+        "barrier": {
+          "count": 10,
+          "mean": 421.517,
+          "stdev": 13.7,
+          "ci95": [
+            413.026,
+            430.009
+          ]
+        },
+        "causal_only": {
+          "count": 10,
+          "mean": 474.111,
+          "stdev": 12.133,
+          "ci95": [
+            466.591,
+            481.631
+          ]
+        },
+        "capability_aware": {
+          "count": 10,
+          "mean": 424.143,
+          "stdev": 23.877,
+          "ci95": [
+            409.344,
+            438.942
+          ]
+        },
+        "queue_aware": {
+          "count": 10,
+          "mean": 156.995,
+          "stdev": 1.575,
+          "ci95": [
+            156.018,
+            157.971
+          ]
+        },
+        "full": {
+          "count": 10,
+          "mean": 150.703,
+          "stdev": 2.678,
+          "ci95": [
+            149.043,
+            152.363
+          ]
+        }
+      },
+      "gate": {
+        "applicable": true,
+        "cleared": false,
+        "relative_improvement": -0.6821,
+        "effect_size_ok": false,
+        "bands_separated": false
+      }
+    }
+  ],
+  "excluded": [],
+  "overall_gate_cleared": false
+}

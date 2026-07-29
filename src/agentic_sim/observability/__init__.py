@@ -13,6 +13,7 @@ from agentic_sim.observability.causal_verifier import (
 )
 from agentic_sim.observability.kernel_benchmarks import KERNEL_SHAPES, run_kernel_benchmarks
 from agentic_sim.observability.kernel_invariants import graph_metrics
+from agentic_sim.observability.scheduler_gate import WORKLOAD_VARIANTS, run_scheduler_contribution_gate
 from agentic_sim.observability.summaries import RunSummary, build_run_summary
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "LocalTelemetry",
     "RunSummary",
     "Telemetry",
+    "WORKLOAD_VARIANTS",
     "aggregate_run_artifacts",
     "aggregate_run_stats",
     "build_message_edges",
@@ -29,6 +31,7 @@ __all__ = [
     "build_run_summary",
     "graph_metrics",
     "run_kernel_benchmarks",
+    "run_scheduler_contribution_gate",
     "verify",
     "write_run_artifacts",
 ]
