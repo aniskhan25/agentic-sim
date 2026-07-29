@@ -4,6 +4,7 @@ from agentic_sim.execution.backend_factory import create_execution_backend
 from agentic_sim.execution.context_builder import ContextBuilder
 from agentic_sim.execution.mock_backend import MockExecutionBackend
 from agentic_sim.execution.supply_chain_backend import SupplyChainRuleBackend
+from agentic_sim.execution.sync_provider_adapter import SynchronousProviderAdapter
 
 __all__ = [
     "AittaExecutionBackend",
@@ -11,6 +12,7 @@ __all__ = [
     "ContextBuilder",
     "MockExecutionBackend",
     "SupplyChainRuleBackend",
+    "SynchronousProviderAdapter",
     "check_aitta_connection",
     "create_execution_backend",
 ]
