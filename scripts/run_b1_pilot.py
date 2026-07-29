@@ -61,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--self-hosted-base-url")
     parser.add_argument("--self-hosted-model")
     parser.add_argument("--self-hosted-timeout", type=float, default=60.0)
+    parser.add_argument(
+        "--self-hosted-max-concurrency",
+        type=int,
+        default=8,
+        help=(
+            "Backend-declared concurrent-request capacity -- SelfHostedExecutionBackend derives "
+            "capabilities.supports_concurrency as max_concurrency > 1, and CapabilityAwareDispatchPolicy "
+            "(and everything built on it: queue_aware, full) dispatch sequentially whenever that's False, "
+            "silently discarding any real concurrency benefit. Must be > 1 for those rungs to mean anything; "
+            "8 matches CapabilityAwareDispatchPolicy's own default max_workers."
+        ),
+    )
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--steps-per-repeat", type=int, default=5)
     parser.add_argument("--warmup-backend-step-count", type=int, default=20)
@@ -79,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
             "self_hosted_base_url": args.self_hosted_base_url,
             "self_hosted_model": args.self_hosted_model,
             "self_hosted_timeout": args.self_hosted_timeout,
+            "self_hosted_max_concurrency": args.self_hosted_max_concurrency,
             "self_hosted_temperature": _FROZEN_TEMPERATURE,
             "self_hosted_top_p": _FROZEN_TOP_P,
             "self_hosted_max_completion_tokens": _FROZEN_MAX_COMPLETION_TOKENS,
