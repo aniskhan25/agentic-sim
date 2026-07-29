@@ -2,13 +2,15 @@
 
 This document is `docs/research_roadmap.md` item 18: "Freeze common-denominator and platform-tuning procedures before HPC data collection." Its wording, and `evaluation_plan.md`'s Statistical Design bullet ("Freeze workloads, primary contrasts, and configuration-selection **procedures** before primary collection") and B2 ("select configurations through a documented pre-experiment **procedure**" then "**freeze the selected configurations** before collecting primary results"), all draw the same distinction: freezing the *methodology* for choosing a configuration is a separate, earlier act than freezing the *configuration itself*. This document does the former. It is written before any self-hosted backend exists and before any real HPC data has been collected, precisely so the rule can't be quietly shaped by results it hasn't seen yet — the same discipline `docs/scheduler_contribution_gate.md` (item 14) already applied to the scheduler-effect decision gate, reused here rather than reinvented, for a different axis: B1/B2 serving-configuration selection, not scheduler-policy contrasts (those stay exactly as items 12-14 already defined them).
 
-**Scope note, stated plainly**: this freezes *procedures*, not *values*. No self-hosted `ExecutionBackend` exists in code today and no HPC access has produced any data — the actual selected `--tensor-parallel-size`, attention backend, etc. for either system do not exist yet and are not invented here. `docs/lumi_deployment_manifest.md` and `docs/roihu_deployment_manifest.md` cover each system's concrete B1 configuration and sweep space already; this document does not repeat them, only cross-references them.
+**Scope note, stated plainly**: this freezes *procedures*, not *values*. It was written before any self-hosted `ExecutionBackend` existed and before any real HPC data had been collected, and stays unmodified now that both exist (item 19) — B1's actual values are frozen separately, in `docs/b1_frozen_configuration.md`, precisely so this procedure document's methodology can't be read as having been shaped by the results it produced. `docs/lumi_deployment_manifest.md` and `docs/roihu_deployment_manifest.md` cover each system's concrete B1 configuration and sweep space already; this document does not repeat them, only cross-references them.
 
 ## Common-denominator mode — frozen procedure
 
 ### Feature-parity determination
 
 Before any run: for each system, enumerate the serving-runtime features actually available and stable (structured output, prefix caching, a given batching mode, a given KV-cache dtype). Take the **intersection** across both systems. Disable, on both systems, any feature not in that intersection — never enable a feature on one system only "because it's available there." This is the literal operational meaning of B1's "largest stable shared feature set": a stable feature is only in-scope for common-denominator mode if it's confirmed available on *both* LUMI and Roihu at the time the intersection is computed, not assumed transferable from one platform's documentation to the other's.
+
+This has now actually been run: `docs/b1_frozen_configuration.md` records the real result, captured by running `vllm serve --help=all` on a live GPU node on each system (not from documentation or a login-node command — both systems' `vllm serve --help`/`--version` fail outright with no GPU present, confirmed). Prefix caching and structured outputs are in the intersection (present on both); KV-cache dtype's intersection is narrower than "fp8" alone — `fp8_e4m3` only, since ROCm doesn't support `fp8_e5m2`, per vLLM's own documented behavior.
 
 ### Statistical commitments (closing `docs/lumi_deployment_manifest.md`'s deferred placeholder)
 
@@ -39,5 +41,6 @@ Select once, using the procedure above, **before** collecting any primary result
 
 ## What this does not freeze
 
-- The actual selected configuration values for LUMI or Roihu — neither exists yet; no self-hosted `ExecutionBackend` and no HPC access exist today (see `docs/lumi_deployment_manifest.md`'s and `docs/roihu_deployment_manifest.md`'s Explicit gaps sections, unchanged).
+- The actual selected B2 (platform-tuned) configuration values for LUMI or Roihu — B1's values are now frozen (`docs/b1_frozen_configuration.md`, confirmed live against real hardware on both systems), but B2 requires running the actual sweep/selection procedure above, which hasn't happened.
 - The scheduler-policy contrasts (sequential vs. causal-only, causal-only vs. full) — already frozen by items 12-14; unaffected by this document.
+- The primary 10-repetition data collection itself — `docs/b1_frozen_configuration.md` records the resolved model, precision, serving-runtime pairing, and feature-parity intersection, but no repetitions of any workload have been run yet under this procedure.

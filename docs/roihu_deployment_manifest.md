@@ -34,16 +34,18 @@ Model choice: the same pinned 8B-class dense model as `docs/lumi_deployment_mani
 
 Per `evaluation_plan.md` B1, every item mapped to a concrete value or an explicit deployment-time placeholder:
 
+**All rows below are now frozen, not placeholders** — see `docs/b1_frozen_configuration.md` for the full record and how each value was actually confirmed live on both systems.
+
 | B1 requirement | Concrete value for this manifest |
 |---|---|
-| identical model revision and tokenizer | the same pinned 8B-class checkpoint as `docs/lumi_deployment_manifest.md` (one revision, shared across both platform manifests) |
+| identical model revision and tokenizer | `Qwen/Qwen2.5-7B-Instruct` @ `a09a35458c702b33eeacc393d103063234e8bc28` (same pinned checkpoint as `docs/lumi_deployment_manifest.md`) — ungated, confirmed to load via a real `vllm serve` health check |
 | BF16 as primary common precision | `--dtype auto` resolving to BF16 (GH200's Hopper architecture natively supports BF16, same as the model's native weight dtype) |
-| identical prompt corpus and output-token limit | the same versioned synthetic-kernel/storm/supply-chain workload definitions as LUMI, with the same fixed `--max-model-len` (a B1 requirement is that this value be identical across systems, not independently chosen) |
-| same serving-runtime revision or paired compatible revisions | **open coordination item, not yet closed**: Roihu's vLLM is CSC-delivered at a fixed `0.19.1`/`0.18.0`; LUMI's is manually built per `docs/amd_vllm_lumi_tuning.md` with no version pinned yet. Whichever team runs the actual B1 collection must confirm LUMI's ROCm build can target the same `0.19.1` (or record the paired-compatible-revisions exception explicitly) before results are compared — not asserted as already resolved here. |
-| identical decoding parameters | fixed temperature/top-p/max-tokens shared across both systems (same values as LUMI's manifest, pinned once the model is chosen) |
-| matched batching, structured-output, and prefix-cache features | `--max-num-batched-tokens` and `--max-num-seqs` set to the same values as LUMI; structured-output/prefix-cache features disabled on whichever platform doesn't support them, per the feature-parity intersection procedure `docs/hpc_data_collection_procedures.md` freezes |
+| identical prompt corpus and output-token limit | the same versioned synthetic-kernel/storm/supply-chain workload definitions as LUMI, with `--max-model-len 8192` — confirmed workable on both systems |
+| same serving-runtime revision or paired compatible revisions | **resolved, paired not identical**: Roihu's `python-vllm/0.19.1` paired with LUMI's `lumi-multitorch-u24r70f21m50t210-20260415_130625` container (vLLM `0.19.0`) — the closest pairing available in LUMI's container history (checked every dated build on disk); no exact match exists. See `docs/b1_frozen_configuration.md`. |
+| identical decoding parameters | `temperature=0.2`, `top_p=0.95`, `max_completion_tokens=256` — reusing `OpenAICompatibleExecutionBackend`'s existing defaults, same as LUMI's manifest |
+| matched batching, structured-output, and prefix-cache features | `--max-num-batched-tokens 16384`, `--max-num-seqs 64`, same as LUMI; `--enable-prefix-caching` and `--structured-outputs-config` enabled on both (confirmed present in both systems' `vllm serve --help=all` output); `--kv-cache-dtype fp8_e4m3` (not bare `fp8` — ROCm doesn't support the `fp8_e5m2` variant CUDA does) |
 | fixed warm-up, duration, and repetition rule | the same frozen rule as LUMI: `docs/hpc_data_collection_procedures.md` (item 18) — 20 discarded warm-up requests, 10 repetitions per workload/model/placement-level/mode combination, 30-minute per-configuration wall-clock budget |
-| exclusive model-server allocations | one `sbatch`/`srun` job per experiment, requesting an exclusive `--gres=gpu:gh200:N` allocation (SLURM's GPU generic-resource accounting prevents another job from sharing the same GPUs) |
+| exclusive model-server allocations | one `sbatch`/`srun` job per experiment, requesting `--gres=gpu:gh200:N` — **with a real caveat discovered live**: a fixed port is not private to one job on this shared partition (confirmed: a health check on a fixed port once returned a different, unrelated user's concurrent server, `mistralai/Mistral-Small-4-119B-2603`, running on the same node). Every job must use a unique port (derived from `$SLURM_JOB_ID`) and verify the responding server's model path matches — see `docs/b1_frozen_configuration.md`'s Operational finding. |
 | recorded compiler, driver, ROCm or CUDA, Python, framework, container, and serving-runtime versions | `PlatformManifest.for_roihu(...)`'s `driver_version`/`serving_runtime_version` fields, plus `framework_versions` for the PyTorch/CUDA-stack versions confirmed above — all supplied at deployment time, with today's confirmed container versions (Python 3.12.12, PyTorch 2.10.0+cu129, vLLM 0.19.1) as the current starting point |
 
 Starting point for the actual `vllm serve` invocation (single-GPU placement):
@@ -93,7 +95,8 @@ Multi-node inference remains a stretch experiment, per the roadmap's own scope (
 
 ## Explicit gaps
 
-- `SelfHostedExecutionBackend` has never been run against a real vLLM server on Roihu — no live deployment exists yet, same as LUMI.
-- No `run_roihu.sh`/`run_roihu_array.sh` SLURM job script exists yet to launch `vllm serve` and orchestrate a run — future work, mirroring `scripts/run_lumi.sh`'s current CPU-only, Aitta-only state.
+- `SelfHostedExecutionBackend` has now run against a real vLLM server on real Roihu hardware (item 19's smoke test, and again for the B1 model-load confirmation) — but only ad hoc `srun` invocations so far, not the actual 10-repetition primary study.
+- No `run_roihu.sh`/`run_roihu_array.sh` SLURM job script exists yet to launch `vllm serve` and orchestrate a run — the ad hoc job scripts used for the smoke test/B1 confirmation are a real precedent to build from, but a proper reusable script remains future work.
+- An `agentic-sim` checkout now exists on Roihu scratch (`/scratch/project_2014553/anisrahm/agentic-sim`), installed via the `python-vllm` container's own Python since no other 3.11+ interpreter exists on the login node.
 - The exact NVIDIA driver version is not asserted anywhere in this document — `nvidia-smi` is unavailable on the login node (no GPU device there); it must be recorded from an actual GPU compute node via `PlatformManifest.for_roihu(...)`'s required `driver_version` argument at deployment time.
 - Whether LUMI's manually-built ROCm vLLM stack can be pinned to the same `0.19.1` release Roihu ships as a fixed CSC module is an open coordination item (see the common-denominator table's "same serving-runtime revision" row) — not resolved by this document.

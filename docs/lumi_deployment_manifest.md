@@ -22,18 +22,18 @@ From `evaluation_plan.md`'s Evaluation Platforms table and `docs/amd_vllm_lumi_t
 
 ## Common-denominator configuration
 
-Per `evaluation_plan.md` B1 ("largest stable shared feature set"), every item mapped to a concrete value or an explicit deployment-time placeholder:
+Per `evaluation_plan.md` B1 ("largest stable shared feature set"), every item mapped to a concrete value. **All rows below are now frozen, not placeholders** — see `docs/b1_frozen_configuration.md` for the full record and how each value was actually confirmed live on both systems:
 
 | B1 requirement | Concrete value for this manifest |
 |---|---|
-| identical model revision and tokenizer | one pinned 8B-class model checkpoint (exact revision recorded at deployment time — not invented here) |
+| identical model revision and tokenizer | `Qwen/Qwen2.5-7B-Instruct` @ `a09a35458c702b33eeacc393d103063234e8bc28` — ungated, confirmed to load on both systems via a real `vllm serve` health check |
 | BF16 as primary common precision | `--dtype auto` resolving to BF16 (the model's native weight dtype on ROCm) |
-| identical prompt corpus and output-token limit | the versioned synthetic-kernel/storm/supply-chain workload definitions already frozen by items 9/15, with a fixed `--max-model-len` sized to the actual agent-context requirement, per `amd_vllm_lumi_tuning.md`'s "do not leave this much larger than the workload requires" |
-| same serving-runtime revision or paired compatible revisions | one pinned vLLM release, identical on both LUMI and Roihu where the same release supports both ROCm and CUDA; recorded in `PlatformManifest.serving_runtime_version` |
-| identical decoding parameters | fixed temperature/top-p/max-tokens shared across both systems (values pinned once the model is chosen, not asserted here) |
-| matched batching, structured-output, and prefix-cache features | `--max-num-batched-tokens` and `--max-num-seqs` set to identical values on both systems; structured-output/prefix-cache features disabled on whichever platform doesn't support them, per B1's "disabling unavailable features on both platforms" |
+| identical prompt corpus and output-token limit | the versioned synthetic-kernel/storm/supply-chain workload definitions already frozen by items 9/15, with `--max-model-len 8192` — confirmed workable on both systems |
+| same serving-runtime revision or paired compatible revisions | **paired, not identical**: LUMI's `lumi-multitorch-u24r70f21m50t210-20260415_130625` container (vLLM `0.19.0`) paired with Roihu's `python-vllm/0.19.1` — the closest pairing available in LUMI's container history; see `docs/b1_frozen_configuration.md` for why no exact match exists |
+| identical decoding parameters | `temperature=0.2`, `top_p=0.95`, `max_completion_tokens=256` — reusing `OpenAICompatibleExecutionBackend`'s existing defaults |
+| matched batching, structured-output, and prefix-cache features | `--max-num-batched-tokens 16384`, `--max-num-seqs 64` on both systems; `--enable-prefix-caching` and `--structured-outputs-config` enabled on both (confirmed present in both systems' `vllm serve --help=all` output); `--kv-cache-dtype fp8_e4m3` (not bare `fp8` — ROCm doesn't support the `fp8_e5m2` variant CUDA does, so the intersection is narrower than either system's full support) |
 | fixed warm-up, duration, and repetition rule | frozen in `docs/hpc_data_collection_procedures.md` (item 18): 20 discarded warm-up requests (count-based, not time-based, so the rule stays identical across systems of different raw speed), 10 repetitions per workload/model/placement-level/mode combination, 30-minute per-configuration wall-clock budget — reusing `scripts/run_lumi.sh`'s existing `AITTA_WARMUP`-style warm-up-then-wait pattern, generalized to poll the self-hosted server's health endpoint instead of Aitta |
-| exclusive model-server allocations | one `sbatch` job per experiment, exclusive node allocation (no co-scheduled jobs sharing GPUs) |
+| exclusive model-server allocations | one `sbatch`/`srun` job per experiment — **with a real caveat discovered live**: a fixed port is not private to one job on these shared partitions (confirmed: a health check on a fixed port once returned a different, unrelated user's concurrent server). Every job must use a unique port (e.g. derived from `$SLURM_JOB_ID`) and verify the responding server's model path matches, not just that a server responded — see `docs/b1_frozen_configuration.md`'s Operational finding |
 | recorded compiler, driver, ROCm, Python, framework, container, and serving-runtime versions | `PlatformManifest.for_lumi(...)`'s `driver_version`/`serving_runtime_version` fields, plus `framework_versions` (inherited from the base `PlatformManifest`) for PyTorch/ROCm-stack versions — all supplied at deployment time |
 
 Starting point for the actual `vllm serve` invocation (single-GCD placement, adapted from `amd_vllm_lumi_tuning.md`'s smaller-model example):
@@ -83,7 +83,7 @@ Extends `scripts/run_lumi.sh`'s existing pattern (env sourcing, module loading, 
 
 ## Explicit gaps
 
-- `SelfHostedExecutionBackend` exists and is tested against a fake transport, exactly like `AittaExecutionBackend` always has been — but has never been run against a real vLLM server, since no self-hosted deployment exists yet.
-- `scripts/run_lumi.sh`/`run_lumi_array.sh` today only request LUMI's CPU-only `small` partition and only call Aitta — they do not request a GPU partition or launch a server. Wiring them to launch `vllm serve` and use the new backend remains future work.
-- Exact ROCm/driver/vLLM version numbers are not asserted anywhere in this document — they are recorded at actual deployment time via `PlatformManifest.for_lumi(...)`'s required `driver_version`/`serving_runtime_version` arguments, per `evaluation_plan.md`'s "refreshed when experiments begin" wording.
-- The Roihu (NVIDIA/CUDA) half of item 17 does not exist yet — this document covers LUMI only.
+- `SelfHostedExecutionBackend` has now run against a real vLLM server on real LUMI hardware (item 19's first smoke test, and again for the B1 model-load confirmation above) — but only ad hoc `srun` invocations so far, not the actual 10-repetition primary study.
+- `scripts/run_lumi.sh`/`run_lumi_array.sh` today only request LUMI's CPU-only `small` partition and only call Aitta — they do not request a GPU partition or launch a server. A proper GPU-enabled job script (mirroring the ad hoc job scripts used for the smoke test and B1 confirmation) remains future work.
+- vLLM version is now pinned for B1 (see the table above and `docs/b1_frozen_configuration.md`); the ROCm/driver version itself is still not asserted anywhere in this document — recorded at actual deployment time via `PlatformManifest.for_lumi(...)`'s required `driver_version` argument, per `evaluation_plan.md`'s "refreshed when experiments begin" wording.
+- The Roihu (NVIDIA/CUDA) half of item 17 now exists (`docs/roihu_deployment_manifest.md`).
