@@ -11,19 +11,31 @@ from agentic_sim.execution.openai_compatible_backend import (
     _first_choice_text,
     _json_object,
 )
+from agentic_sim.models import PlatformManifest
 
 
-class AittaExecutionBackend(OpenAICompatibleExecutionBackend):
-    """OpenAI-compatible Aitta chat-completions backend.
+class SelfHostedExecutionBackend(OpenAICompatibleExecutionBackend):
+    """OpenAI-compatible client for a self-hosted model server (e.g. vLLM on
+    LUMI/Roihu) -- item 19's prerequisite for the real two-system HPC study.
+    Shares all request/response/repair/role-policy/receipt logic with
+    AittaExecutionBackend via OpenAICompatibleExecutionBackend; differs only
+    in what's genuinely different about a self-hosted deployment:
 
-    A thin subclass of OpenAICompatibleExecutionBackend (item 19): every
-    piece of request/response/repair/role-policy/receipt logic is shared
-    with SelfHostedExecutionBackend via the base class. Only what's
-    genuinely Aitta-specific lives here: required credentials, env var
-    names, and capability defaults.
+    - no required API key (most self-hosted vLLM servers run without auth;
+      `_send`'s base-class header logic already omits Authorization when
+      `api_key` is empty, so this needs no override at all);
+    - env vars are generically named (SELF_HOSTED_*, not AITTA_*);
+    - `enable_prefix_caching` and `max_context_tokens` are caller-supplied,
+      since a deployed `vllm serve` invocation's real flags aren't
+      discoverable over the OpenAI-compatible API itself;
+    - an optional `platform_manifest` (see models/platform_manifest.py,
+      ADR 0005) can be attached so every produced receipt carries
+      `manifest_mode`, marking the run as primary evidence rather than a
+      portability observation -- left unset (None) by default, never
+      invented.
     """
 
-    name = "aitta"
+    name = "self_hosted"
 
     def __init__(
         self,
@@ -38,24 +50,34 @@ class AittaExecutionBackend(OpenAICompatibleExecutionBackend):
         temperature: float = 0.2,
         top_p: float = 0.95,
         max_completion_tokens: int | None = None,
+        max_context_tokens: int | None = None,
+        enable_prefix_caching: bool = False,
         transport: Transport | None = None,
+        platform_manifest: PlatformManifest | None = None,
     ) -> None:
-        resolved_api_key = api_key or os.environ.get("AITTA_API_KEY", "")
-        resolved_base_url = base_url or os.environ.get("AITTA_BASE_URL", "")
-        resolved_model_name = model_name or os.environ.get("AITTA_MODEL", "")
+        resolved_api_key = api_key or os.environ.get("SELF_HOSTED_API_KEY", "")
+        resolved_base_url = base_url or os.environ.get("SELF_HOSTED_BASE_URL", "")
+        resolved_model_name = model_name or os.environ.get("SELF_HOSTED_MODEL", "")
         resolved_timeout = float(
-            timeout_seconds if timeout_seconds is not None else os.environ.get("AITTA_REQUEST_TIMEOUT", 120)
+            timeout_seconds
+            if timeout_seconds is not None
+            else os.environ.get("SELF_HOSTED_REQUEST_TIMEOUT", 120)
         )
         resolved_max_completion_tokens = int(
-            max_completion_tokens or os.environ.get("AITTA_MAX_COMPLETION_TOKENS", 256)
+            max_completion_tokens or os.environ.get("SELF_HOSTED_MAX_COMPLETION_TOKENS", 256)
         )
 
-        if not resolved_api_key:
-            raise ValueError("AITTA_API_KEY is required for the Aitta backend")
         if not resolved_base_url:
-            raise ValueError("AITTA_BASE_URL is required for the Aitta backend")
+            raise ValueError("SELF_HOSTED_BASE_URL is required for the self-hosted backend")
         if not resolved_model_name:
-            raise ValueError("AITTA_MODEL is required for the Aitta backend")
+            raise ValueError("SELF_HOSTED_MODEL is required for the self-hosted backend")
+        # api_key is deliberately NOT required -- most self-hosted vLLM
+        # deployments run with no --api-key at all.
+
+        self.enable_prefix_caching = enable_prefix_caching
+        self.max_context_tokens = (
+            int(max_context_tokens) if max_context_tokens is not None else resolved_max_completion_tokens
+        )
 
         super().__init__(
             api_key=resolved_api_key,
@@ -69,6 +91,7 @@ class AittaExecutionBackend(OpenAICompatibleExecutionBackend):
             top_p=top_p,
             max_completion_tokens=resolved_max_completion_tokens,
             transport=transport,
+            platform_manifest=platform_manifest,
         )
 
     @property
@@ -77,14 +100,14 @@ class AittaExecutionBackend(OpenAICompatibleExecutionBackend):
             supports_concurrency=self.max_concurrency > 1,
             supports_server_batching=False,
             supports_structured_output=True,
-            supports_prefix_caching=False,
-            max_context_tokens=self.max_completion_tokens,
+            supports_prefix_caching=self.enable_prefix_caching,
+            max_context_tokens=self.max_context_tokens,
             observable_token_usage=True,
             observable_energy=False,
         )
 
 
-def check_aitta_connection(
+def check_self_hosted_connection(
     *,
     api_key: str | None = None,
     base_url: str | None = None,
@@ -93,7 +116,7 @@ def check_aitta_connection(
     max_retries: int = 0,
     transport: Transport | None = None,
 ) -> dict[str, Any]:
-    backend = AittaExecutionBackend(
+    backend = SelfHostedExecutionBackend(
         api_key=api_key,
         base_url=base_url,
         model_name=model_name,

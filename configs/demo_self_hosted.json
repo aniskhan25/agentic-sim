@@ -1,0 +1,22 @@
+{
+  "comment": "Curated demo run for a self-hosted OpenAI-compatible server (e.g. vLLM on LUMI/Roihu, item 19). Storm scenario with a realistic 6-tick fixture, 64 agents. Set SELF_HOSTED_BASE_URL/SELF_HOSTED_MODEL (or the execution.self_hosted_* keys below) to point at a real running server -- there is no live server to run this against yet; see docs/lumi_deployment_manifest.md.",
+  "scenario": {
+    "name": "storm",
+    "agent_replicas": 64,
+    "parameters": {
+      "fixture": "data/fixtures/storm_helsinki_oulu.json"
+    }
+  },
+  "steps": 6,
+  "scheduler": {
+    "policy": "fifo",
+    "max_events_per_tick": 512
+  },
+  "execution": {
+    "backend": "self_hosted",
+    "max_batch_size": 32
+  },
+  "storage": {
+    "mode": "sqlite"
+  }
+}

@@ -56,6 +56,31 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.backend_options["aitta_model"], "demo/model")
         self.assertEqual(config.backend_options["aitta_timeout"], 45)
 
+    def test_self_hosted_execution_options_load_from_config(self):
+        with TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "self_hosted.json"
+            config_path.write_text(
+                """
+                {
+                  "execution": {
+                    "backend": "self_hosted",
+                    "self_hosted_base_url": "http://localhost:8000/v1",
+                    "self_hosted_model": "demo/model",
+                    "self_hosted_timeout": 45,
+                    "self_hosted_enable_prefix_caching": true
+                  }
+                }
+                """
+            )
+
+            config = load_config(str(config_path))
+
+        self.assertEqual(config.backend, "self_hosted")
+        self.assertEqual(config.backend_options["self_hosted_base_url"], "http://localhost:8000/v1")
+        self.assertEqual(config.backend_options["self_hosted_model"], "demo/model")
+        self.assertEqual(config.backend_options["self_hosted_timeout"], 45)
+        self.assertTrue(config.backend_options["self_hosted_enable_prefix_caching"])
+
     def test_seed_defaults_to_none(self):
         config = load_config(str(Path("configs") / "storm_small.json"))
 

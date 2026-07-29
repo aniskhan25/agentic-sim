@@ -44,6 +44,17 @@ def load_config(path: str | None) -> RuntimeConfig:
         "aitta_top_p",
         "aitta_max_completion_tokens",
         "aitta_max_json_repair_attempts",
+        "self_hosted_base_url",
+        "self_hosted_model",
+        "self_hosted_timeout",
+        "self_hosted_max_retries",
+        "self_hosted_max_concurrency",
+        "self_hosted_temperature",
+        "self_hosted_top_p",
+        "self_hosted_max_completion_tokens",
+        "self_hosted_max_json_repair_attempts",
+        "self_hosted_max_context_tokens",
+        "self_hosted_enable_prefix_caching",
     ):
         if key in execution:
             backend_options[key] = execution[key]

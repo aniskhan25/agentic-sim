@@ -205,3 +205,50 @@ class CliTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["attempts"], 2)
         sleep.assert_called_once_with(0)
+
+    def test_check_self_hosted_reports_missing_credentials(self):
+        keys = ["SELF_HOSTED_BASE_URL", "SELF_HOSTED_MODEL"]
+        old_values = {key: os.environ.get(key) for key in keys}
+        try:
+            for key in keys:
+                os.environ[key] = ""
+            with redirect_stdout(StringIO()) as stdout:
+                exit_code = main(["check-self-hosted"])
+        finally:
+            for key, value in old_values.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.assertEqual(exit_code, 1)
+        payload = json.loads(stdout.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertIn("SELF_HOSTED", payload["error"])
+
+    def test_check_self_hosted_waits_until_probe_succeeds(self):
+        with patch("agentic_sim.cli.time.sleep") as sleep:
+            with patch(
+                "agentic_sim.cli.check_self_hosted_connection",
+                side_effect=[
+                    RuntimeError("server is starting"),
+                    {"ok": True, "base_url": "http://localhost:8000/v1", "model": "demo"},
+                ],
+            ):
+                with redirect_stdout(StringIO()) as stdout:
+                    exit_code = main(
+                        [
+                            "check-self-hosted",
+                            "--wait",
+                            "--wait-timeout",
+                            "30",
+                            "--wait-interval",
+                            "0",
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["attempts"], 2)
+        sleep.assert_called_once_with(0)

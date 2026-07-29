@@ -8,7 +8,7 @@ from pathlib import Path
 
 from agentic_sim.config import load_config, merge_cli
 from agentic_sim.engine import create_engine
-from agentic_sim.execution import check_aitta_connection
+from agentic_sim.execution import check_aitta_connection, check_self_hosted_connection
 from agentic_sim.observability import (
     aggregate_run_artifacts,
     aggregate_run_stats,
@@ -28,7 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", help="Path to a JSON runtime config")
     run.add_argument("--scenario", help="Scenario name")
     run.add_argument("--steps", type=int, help="Number of simulation steps")
-    run.add_argument("--backend", choices=["mock", "rule", "aitta"], help="Execution backend")
+    run.add_argument(
+        "--backend", choices=["mock", "rule", "aitta", "self_hosted"], help="Execution backend"
+    )
     run.add_argument("--storage-mode", choices=["memory", "sqlite"], help="State storage mode")
     run.add_argument("--sqlite-path", help="SQLite database path")
     run.add_argument("--max-batch-size", type=int)
@@ -50,6 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--aitta-max-completion-tokens",
         type=int,
         help="Aitta max completion tokens per agent step",
+    )
+    run.add_argument("--self-hosted-base-url", help="OpenAI-compatible self-hosted server base URL")
+    run.add_argument("--self-hosted-model", help="Self-hosted server model name")
+    run.add_argument(
+        "--self-hosted-timeout", type=float, help="Self-hosted request timeout in seconds"
+    )
+    run.add_argument(
+        "--self-hosted-max-concurrency", type=int, help="Self-hosted request concurrency"
     )
     run.add_argument("--seed", type=int, help="Seed label for this run (for repeated-trial grouping)")
     run.add_argument("--output", help="Write full run artifact JSON to this path")
@@ -75,6 +85,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum seconds to wait when --wait is set",
     )
     check_aitta.add_argument(
+        "--wait-interval",
+        type=float,
+        default=30,
+        help="Seconds between probes when --wait is set",
+    )
+
+    check_self_hosted = subcommands.add_parser(
+        "check-self-hosted",
+        help="Check self-hosted OpenAI-compatible chat-completions connectivity",
+    )
+    check_self_hosted.add_argument(
+        "--self-hosted-base-url", help="OpenAI-compatible self-hosted server base URL"
+    )
+    check_self_hosted.add_argument("--self-hosted-model", help="Self-hosted server model name")
+    check_self_hosted.add_argument(
+        "--self-hosted-timeout", type=float, help="Self-hosted request timeout in seconds"
+    )
+    check_self_hosted.add_argument(
+        "--self-hosted-max-retries", type=int, help="Self-hosted request retry count"
+    )
+    check_self_hosted.add_argument(
+        "--wait",
+        action="store_true",
+        help="Poll until the self-hosted server responds or the warm-up timeout expires",
+    )
+    check_self_hosted.add_argument(
+        "--wait-timeout",
+        type=float,
+        default=900,
+        help="Maximum seconds to wait when --wait is set",
+    )
+    check_self_hosted.add_argument(
         "--wait-interval",
         type=float,
         default=30,
@@ -114,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_command(args)
     if args.command == "check-aitta":
         return check_aitta_command(args)
+    if args.command == "check-self-hosted":
+        return check_self_hosted_command(args)
     if args.command == "aggregate-runs":
         return aggregate_runs_command(args)
     if args.command == "aggregate-stats":
@@ -139,6 +183,7 @@ def run_command(args: argparse.Namespace) -> int:
         },
     )
     config.backend_options.update(_aitta_cli_options(args))
+    config.backend_options.update(_self_hosted_cli_options(args))
     engine = create_engine(
         scenario=config.scenario,
         scenario_parameters=config.scenario_parameters,
@@ -195,6 +240,19 @@ def _aitta_cli_options(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def _self_hosted_cli_options(args: argparse.Namespace) -> dict[str, object]:
+    return {
+        key: value
+        for key, value in {
+            "self_hosted_base_url": getattr(args, "self_hosted_base_url", None),
+            "self_hosted_model": getattr(args, "self_hosted_model", None),
+            "self_hosted_timeout": getattr(args, "self_hosted_timeout", None),
+            "self_hosted_max_concurrency": getattr(args, "self_hosted_max_concurrency", None),
+        }.items()
+        if value is not None
+    }
+
+
 def check_aitta_command(args: argparse.Namespace) -> int:
     started = time.monotonic()
     attempts = 0
@@ -211,6 +269,48 @@ def check_aitta_command(args: argparse.Namespace) -> int:
                     model_name=args.aitta_model,
                     timeout_seconds=args.aitta_timeout,
                     max_retries=args.aitta_max_retries or 0,
+                )
+            except Exception as exc:
+                last_error = str(exc)
+                if not args.wait or time.monotonic() - started >= wait_timeout:
+                    raise
+                time.sleep(wait_interval)
+                continue
+            result["attempts"] = attempts
+            result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+            print(json.dumps(result, indent=2))
+            return 0
+    except Exception:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "attempts": attempts,
+                    "elapsed_seconds": round(time.monotonic() - started, 3),
+                    "error": last_error,
+                },
+                indent=2,
+            )
+        )
+        return 1
+
+
+def check_self_hosted_command(args: argparse.Namespace) -> int:
+    started = time.monotonic()
+    attempts = 0
+    last_error = ""
+    wait_timeout = max(0, args.wait_timeout)
+    wait_interval = max(0, args.wait_interval)
+
+    try:
+        while True:
+            attempts += 1
+            try:
+                result = check_self_hosted_connection(
+                    base_url=args.self_hosted_base_url,
+                    model_name=args.self_hosted_model,
+                    timeout_seconds=args.self_hosted_timeout,
+                    max_retries=args.self_hosted_max_retries or 0,
                 )
             except Exception as exc:
                 last_error = str(exc)

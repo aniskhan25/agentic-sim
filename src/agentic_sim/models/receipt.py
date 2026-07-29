@@ -37,6 +37,7 @@ class ExecutionReceipt:
     accelerator: str | None = None
     host_architecture: str | None = None
     serving_runtime: str | None = None
+    manifest_mode: str | None = None
     environment_id: str | None = None
     schema_valid: bool | None = None
     semantic_valid: bool | None = None
