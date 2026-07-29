@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from agentic_sim.environment import SyntheticEnvironment
 from agentic_sim.execution import BatchBuilder, ContextBuilder
+from agentic_sim.execution.failure_injecting_backend import FailureInjectingBackend
 from agentic_sim.execution.synthetic_backend import SyntheticExecutionBackend
 from agentic_sim.models import AgentId, AgentProfile
 from agentic_sim.scenarios.common import create_store
@@ -38,14 +39,19 @@ def create_synthetic_engine(
     shape = scenario_parameters.get("shape", "chain")
     roster, hop_plan, conflict_writes, root_agent_ids = _build_topology(shape, scenario_parameters)
 
+    provider_count = int(scenario_parameters.get("provider_count", 1))
+    role_count = int(scenario_parameters.get("role_count", 1))
+    heterogeneity = _assign_heterogeneity(roster, provider_count=provider_count, role_count=role_count)
+
     profiles = [
         AgentProfile(
             agent_id=AgentId(agent_id),
-            role="synthetic_node",
+            role=heterogeneity[agent_id][1],
             name=agent_id,
             region="synthetic",
             capabilities=[],
             authority_level=1,
+            backend=heterogeneity[agent_id][0],
         )
         for agent_id in roster
     ]
@@ -56,7 +62,14 @@ def create_synthetic_engine(
         environment=environment.initialize(),
         profiles=profiles,
     )
-    backend = SyntheticExecutionBackend(hop_plan=hop_plan, conflict_writes=conflict_writes)
+    backend: Any = SyntheticExecutionBackend(hop_plan=hop_plan, conflict_writes=conflict_writes)
+    failure_injection = scenario_parameters.get("failure_injection")
+    if failure_injection is not None:
+        backend = FailureInjectingBackend(
+            backend,
+            cycle=failure_injection.get("cycle"),
+            failure_plan=failure_injection.get("failure_plan"),
+        )
     inbox_limit = max(len(roster), 5)
 
     from agentic_sim.engine.simulation_engine import SimulationEngine
@@ -70,6 +83,28 @@ def create_synthetic_engine(
         batch_builder=BatchBuilder(max_batch_size=max_batch_size),
         max_events_per_tick=max_events_per_tick,
     )
+
+
+def _assign_heterogeneity(
+    roster: list[str], *, provider_count: int, role_count: int
+) -> dict[str, tuple[str, str]]:
+    """Round-robin backend_hint/role labels across an existing roster.
+    Defaults (provider_count=1, role_count=1) reproduce today's exact
+    uniform backend="mock"/role="synthetic_node" for every node --
+    SyntheticExecutionBackend branches purely by hop_plan/conflict_writes
+    keyed on agent_id, never on role or backend_hint, so these labels are
+    provably inert to simulation behavior; they only affect grouping in
+    BatchBuilder/BarrierDispatchPolicy/CapabilityAwareDispatchPolicy/
+    QueueAwareDispatchPolicy/FullDispatchPolicy.
+    """
+    if provider_count < 1 or role_count < 1:
+        raise ValueError("provider_count and role_count must each be at least 1")
+    assignment: dict[str, tuple[str, str]] = {}
+    for index, agent_id in enumerate(roster):
+        backend_hint = "mock" if provider_count == 1 else f"provider_{index % provider_count}"
+        role = "synthetic_node" if role_count == 1 else f"role_{index % role_count}"
+        assignment[agent_id] = (backend_hint, role)
+    return assignment
 
 
 def _build_topology(
@@ -142,10 +177,17 @@ def _build_topology(
         writers = int(params.get("writers", 3))
         if writers < 1:
             raise ValueError("conflicting_write writers must be at least 1")
+        conflict_ratio = float(params.get("conflict_ratio", 1.0))
+        if not 0.0 <= conflict_ratio <= 1.0:
+            raise ValueError("conflicting_write conflict_ratio must be between 0.0 and 1.0")
         roster = [f"writer_{i}" for i in range(writers)]
-        conflict_writes = {
-            agent_id: {"key": "x", "value": index} for index, agent_id in enumerate(roster)
-        }
+        conflicting_count = round(writers * conflict_ratio)
+        conflict_writes = {}
+        for index, agent_id in enumerate(roster):
+            if index < conflicting_count:
+                conflict_writes[agent_id] = {"key": "x", "value": index}
+            else:
+                conflict_writes[agent_id] = {"key": f"y_{index}", "value": index}
         return roster, {}, conflict_writes, list(roster)
 
     raise ValueError(f"unsupported synthetic shape {shape!r}")

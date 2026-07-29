@@ -80,6 +80,62 @@ class SyntheticKernelShapeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             create_synthetic_engine(backend_name="aitta", scenario_parameters={"shape": "chain"})
 
+    def test_conflict_ratio_variants_preserve_invariants_and_zero_violations(self):
+        for conflict_ratio in (1.0, 0.5, 0.0):
+            with self.subTest(conflict_ratio=conflict_ratio):
+                params = {"writers": 4, "conflict_ratio": conflict_ratio}
+                engine = create_synthetic_engine(
+                    scenario_parameters={"shape": "conflicting_write", **params}
+                )
+                engine.run(step_count_for("conflicting_write", params))
+
+                traces = engine.store.traces.list()
+                self.assertEqual(verify(traces).violations, [])
+                # conflict_ratio is an environment-write property, not a causal-graph
+                # one -- expected_invariants (and the actual graph_metrics) must be
+                # unaffected by it.
+                self.assertEqual(
+                    graph_metrics(traces), expected_invariants("conflicting_write", {"writers": 4})
+                )
+
+    def test_conflict_ratio_partitions_writers_between_shared_and_unique_keys(self):
+        params = {"writers": 4, "conflict_ratio": 0.5}
+        engine = create_synthetic_engine(scenario_parameters={"shape": "conflicting_write", **params})
+        engine.run(step_count_for("conflicting_write", params))
+
+        variables = engine.store.environment.get().variables
+        self.assertIn("x", variables)
+        self.assertIn("y_2", variables)
+        self.assertIn("y_3", variables)
+
+    def test_provider_and_role_heterogeneity_preserves_invariants_and_zero_violations(self):
+        for shape, params in NON_CONFLICT_SHAPE_PARAMS:
+            with self.subTest(shape=shape):
+                heterogeneous_params = {**params, "provider_count": 2, "role_count": 2}
+                engine = create_synthetic_engine(
+                    scenario_parameters={"shape": shape, **heterogeneous_params}
+                )
+                engine.run(step_count_for(shape, params))
+
+                traces = engine.store.traces.list()
+                self.assertEqual(verify(traces).violations, [])
+                self.assertEqual(graph_metrics(traces), expected_invariants(shape, params))
+
+    def test_provider_and_role_heterogeneity_actually_varies_profiles(self):
+        engine = create_synthetic_engine(
+            scenario_parameters={
+                "shape": "fork_join",
+                "width": 3,
+                "provider_count": 2,
+                "role_count": 2,
+            }
+        )
+
+        backends = {profile.backend for profile in engine.store.agents.list_profiles()}
+        roles = {profile.role for profile in engine.store.agents.list_profiles()}
+        self.assertEqual(backends, {"provider_0", "provider_1"})
+        self.assertEqual(roles, {"role_0", "role_1"})
+
     def test_all_dispatch_policies_run_identical_workloads_on_non_conflict_shapes(self):
         policies = [
             None,

@@ -20,6 +20,11 @@ KERNEL_SHAPES: list[tuple[str, dict[str, Any]]] = [
     ("independent_branches", {"branch_count": 3, "length": 3}),
     ("mixed_dag", {"length": 3}),
     ("conflicting_write", {"writers": 3}),
+    # Item 15's publication-workload-suite expansion: a partial conflicting-write
+    # ratio and provider/role heterogeneity, both proven behavior-inert to the
+    # causal graph (see tests/test_synthetic_kernel.py's equivalence tests).
+    ("conflicting_write", {"writers": 4, "conflict_ratio": 0.5}),
+    ("fork_join", {"width": 3, "provider_count": 2, "role_count": 2}),
 ]
 
 
