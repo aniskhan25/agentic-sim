@@ -5,8 +5,11 @@ from agentic_sim.observability import graph_metrics, run_kernel_benchmarks, veri
 from agentic_sim.scenarios.synthetic import expected_invariants, step_count_for
 from agentic_sim.scheduling import (
     BarrierDispatchPolicy,
+    CapabilityAwareDispatchPolicy,
     CausalOnlyDispatchPolicy,
+    FullDispatchPolicy,
     NaiveConcurrentDispatchPolicy,
+    QueueAwareDispatchPolicy,
     SequentialDispatchPolicy,
 )
 
@@ -84,6 +87,9 @@ class SyntheticKernelShapeTests(unittest.TestCase):
             NaiveConcurrentDispatchPolicy(),
             BarrierDispatchPolicy(),
             CausalOnlyDispatchPolicy(),
+            CapabilityAwareDispatchPolicy(),
+            QueueAwareDispatchPolicy(),
+            FullDispatchPolicy(),
         ]
         for shape, params in NON_CONFLICT_SHAPE_PARAMS:
             expected = expected_invariants(shape, params)

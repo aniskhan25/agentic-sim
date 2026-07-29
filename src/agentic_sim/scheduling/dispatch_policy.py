@@ -123,40 +123,148 @@ class CausalOnlyDispatchPolicy:
     def dispatch(self, requests, backend):
         concurrent_policy = NaiveConcurrentDispatchPolicy(max_workers=self.max_workers)
         results = []
-        for wave in self._build_waves(requests):
+        for wave in build_causal_waves(requests):
             results.extend(concurrent_policy.dispatch(wave, backend))
         return results
 
     def _build_waves(self, requests: list[ExecutionRequest]) -> list[list[ExecutionRequest]]:
-        activation_ids = {request.activation.activation_id for request in requests}
-        parents_by_id: dict[str, set[str]] = {}
-        for request in requests:
-            parents = {
-                message.origin_activation_id
-                for message in request.inbox_messages
-                if message.origin_activation_id
-            }
-            if request.triggering_event.causal_parent_activation_id:
-                parents.add(request.triggering_event.causal_parent_activation_id)
-            # Only in-batch parents impose an ordering constraint -- a parent
-            # from a prior tick has already committed and imposes no wait here.
-            parents_by_id[request.activation.activation_id] = parents & activation_ids
+        return build_causal_waves(requests)
 
-        remaining = {request.activation.activation_id: request for request in requests}
-        resolved: set[str] = set()
-        waves: list[list[ExecutionRequest]] = []
-        while remaining:
-            ready_ids = [
-                activation_id
-                for activation_id in remaining
-                if parents_by_id[activation_id] <= resolved
-            ]
-            if not ready_ids:
-                # Cycle guard: dispatch what's left rather than hang. Should be
-                # unreachable (causal_verifier's cycle check guards this at
-                # commit time), but fail safe rather than infinite-loop.
-                ready_ids = list(remaining.keys())
-            wave = [remaining.pop(activation_id) for activation_id in ready_ids]
-            waves.append(wave)
-            resolved.update(ready_ids)
-        return waves
+
+def build_causal_waves(requests: list[ExecutionRequest]) -> list[list[ExecutionRequest]]:
+    """Partitions requests into message-causally-independent waves: wave 0
+    has no in-batch parents, wave 1's parents are all in wave 0, etc.
+    Requests within a wave are causally safe to dispatch concurrently;
+    waves themselves must run in order. Only in-batch parents (via
+    Message.origin_activation_id / Event.causal_parent_activation_id)
+    impose an ordering constraint -- a parent from a prior tick has already
+    committed and imposes no wait here. Shared by CausalOnlyDispatchPolicy
+    and the capability/queue-aware/full policies built on top of it.
+    """
+    activation_ids = {request.activation.activation_id for request in requests}
+    parents_by_id: dict[str, set[str]] = {}
+    for request in requests:
+        parents = {
+            message.origin_activation_id
+            for message in request.inbox_messages
+            if message.origin_activation_id
+        }
+        if request.triggering_event.causal_parent_activation_id:
+            parents.add(request.triggering_event.causal_parent_activation_id)
+        parents_by_id[request.activation.activation_id] = parents & activation_ids
+
+    remaining = {request.activation.activation_id: request for request in requests}
+    resolved: set[str] = set()
+    waves: list[list[ExecutionRequest]] = []
+    while remaining:
+        ready_ids = [
+            activation_id for activation_id in remaining if parents_by_id[activation_id] <= resolved
+        ]
+        if not ready_ids:
+            # Cycle guard: dispatch what's left rather than hang. Should be
+            # unreachable (causal_verifier's cycle check guards this at
+            # commit time), but fail safe rather than infinite-loop.
+            ready_ids = list(remaining.keys())
+        wave = [remaining.pop(activation_id) for activation_id in ready_ids]
+        waves.append(wave)
+        resolved.update(ready_ids)
+    return waves
+
+
+class CapabilityAwareDispatchPolicy:
+    """Rung 5: causal-only (rung 4) plus capability-constrained placement.
+    Rungs 1-4 all dispatch via ThreadPoolExecutor regardless of whether the
+    backend declares itself safe for concurrent access -- a real,
+    previously-unaddressed gap. This rung closes it: within each causal
+    wave, requests are grouped by backend_hint (BatchBuilder, same
+    mechanism BarrierDispatchPolicy uses), and each group dispatches
+    concurrently only if backend.capabilities.supports_concurrency is
+    True, otherwise sequentially.
+
+    "Capability-constrained batching" in the server-side merged-batch
+    sense is explicitly deferred: no backend in this codebase declares
+    supports_server_batching=True today, so building logic to exploit it
+    would be untestable dead code.
+    """
+
+    name = "capability_aware"
+
+    def __init__(self, batch_builder: BatchBuilder | None = None, max_workers: int = 8):
+        self.batch_builder = batch_builder or BatchBuilder()
+        self.max_workers = max_workers
+
+    def dispatch(self, requests, backend):
+        results = []
+        for wave in build_causal_waves(requests):
+            for group in self.batch_builder.group(wave):
+                results.extend(self._dispatch_group(group, backend))
+        return results
+
+    def _dispatch_group(self, group, backend):
+        if not backend.capabilities.supports_concurrency:
+            return SequentialDispatchPolicy().dispatch(group, backend)
+        return NaiveConcurrentDispatchPolicy(max_workers=self.max_workers).dispatch(group, backend)
+
+
+class QueueAwareDispatchPolicy(CapabilityAwareDispatchPolicy):
+    """Rung 6: capability-aware (rung 5) plus provider-queue awareness and
+    bounded backpressure. Each backend_hint group's concurrency is capped
+    at a configurable max-in-flight limit (default_max_in_flight, or a
+    per-backend_hint override via max_in_flight) instead of the uncapped
+    default -- ready work beyond the cap queues inside the executor rather
+    than all firing at once. This is real, bounded provider-queue
+    awareness: treating each backend_hint as a provider with a finite
+    concurrent-request budget, something rungs 1-5 do not do (they always
+    dispatch an entire ready group concurrently, uncapped).
+    """
+
+    name = "queue_aware"
+
+    def __init__(
+        self,
+        batch_builder: BatchBuilder | None = None,
+        default_max_in_flight: int = 2,
+        max_in_flight: dict[str, int] | None = None,
+    ):
+        self.batch_builder = batch_builder or BatchBuilder()
+        self.default_max_in_flight = default_max_in_flight
+        self.max_in_flight = max_in_flight or {}
+
+    def _dispatch_group(self, group, backend):
+        if not backend.capabilities.supports_concurrency:
+            return SequentialDispatchPolicy().dispatch(group, backend)
+        hint = group[0].backend_hint
+        limit = self.max_in_flight.get(hint, self.default_max_in_flight)
+        return NaiveConcurrentDispatchPolicy(max_workers=max(1, limit)).dispatch(group, backend)
+
+
+class FullDispatchPolicy(QueueAwareDispatchPolicy):
+    """Rung 7: queue-aware (rung 6) plus reusable-prefix grouping. No
+    backend in this codebase declares supports_prefix_caching today, so
+    there is no real prompt-level prefix-cache signal to exploit; this
+    approximates Phase 6's own "prefix or role similarity" wording via
+    AgentProfile.role -- requests sharing a role share the same
+    role_policy-driven prompt template and are the most likely to share a
+    reusable prefix in practice. Within each capability/queue-aware group,
+    requests are further split by role and dispatched role-group by
+    role-group, so a real prefix-caching-capable backend would see
+    same-role requests submitted adjacently. Real token/prompt-level
+    prefix similarity is deferred as premature -- no backend could exploit
+    it yet.
+    """
+
+    name = "full"
+
+    def dispatch(self, requests, backend):
+        results = []
+        for wave in build_causal_waves(requests):
+            for group in self.batch_builder.group(wave):
+                for role_group in self._group_by_role(group):
+                    results.extend(self._dispatch_group(role_group, backend))
+        return results
+
+    def _group_by_role(self, requests: list[ExecutionRequest]) -> list[list[ExecutionRequest]]:
+        grouped: dict[str, list[ExecutionRequest]] = {}
+        for request in requests:
+            grouped.setdefault(request.agent_profile.role, []).append(request)
+        return list(grouped.values())

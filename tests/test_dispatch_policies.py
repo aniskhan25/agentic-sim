@@ -20,8 +20,11 @@ from agentic_sim.models import (
 )
 from agentic_sim.scheduling import (
     BarrierDispatchPolicy,
+    CapabilityAwareDispatchPolicy,
     CausalOnlyDispatchPolicy,
+    FullDispatchPolicy,
     NaiveConcurrentDispatchPolicy,
+    QueueAwareDispatchPolicy,
     SequentialDispatchPolicy,
 )
 from agentic_sim.utils.time import utc_now
@@ -37,6 +40,18 @@ _CAPABILITIES = ProviderCapabilities(
 )
 
 
+def _capabilities(supports_concurrency: bool) -> ProviderCapabilities:
+    return ProviderCapabilities(
+        supports_concurrency=supports_concurrency,
+        supports_server_batching=False,
+        supports_structured_output=False,
+        supports_prefix_caching=False,
+        max_context_tokens=0,
+        observable_token_usage=False,
+        observable_energy=False,
+    )
+
+
 class _RecordingBackend:
     """Stub ExecutionBackend that records thread identity, call order, and
     call start/end intervals per request -- used to prove real concurrency
@@ -45,10 +60,10 @@ class _RecordingBackend:
     """
 
     name = "stub"
-    capabilities = _CAPABILITIES
 
-    def __init__(self, delays: dict[str, float] | None = None):
+    def __init__(self, delays: dict[str, float] | None = None, capabilities: ProviderCapabilities = _CAPABILITIES):
         self.delays = delays or {}
+        self.capabilities = capabilities
         self.thread_idents: list[int] = []
         self.call_order: list[str] = []
         self.call_intervals: list[tuple[str, float, float]] = []
@@ -69,10 +84,37 @@ class _RecordingBackend:
         return [ExecutionResult(agent_id=request.agent_profile.agent_id, updated_state=request.agent_state)]
 
 
+class _PeakConcurrencyBackend:
+    """Stub ExecutionBackend that tracks the PEAK number of simultaneously
+    in-flight run_batch calls -- used to prove a bounded backpressure cap
+    is actually respected, not just that "more than one thread" was used.
+    """
+
+    name = "peak_stub"
+    capabilities = _capabilities(supports_concurrency=True)
+
+    def __init__(self, delay: float = 0.02):
+        self.delay = delay
+        self.active = 0
+        self.peak_active = 0
+        self._lock = threading.Lock()
+
+    def run_batch(self, requests):
+        with self._lock:
+            self.active += 1
+            self.peak_active = max(self.peak_active, self.active)
+        time.sleep(self.delay)
+        with self._lock:
+            self.active -= 1
+        request = requests[0]
+        return [ExecutionResult(agent_id=request.agent_profile.agent_id, updated_state=request.agent_state)]
+
+
 def _request(
     agent_id: str,
     *,
     backend_hint: str = "mock",
+    role: str = "node",
     inbox_messages: list[Message] | None = None,
     causal_parent_activation_id: str | None = None,
 ) -> ExecutionRequest:
@@ -92,7 +134,7 @@ def _request(
             ready_at=now,
         ),
         agent_profile=AgentProfile(
-            agent_id=AgentId(agent_id), role="node", name=agent_id, region="test", backend=backend_hint
+            agent_id=AgentId(agent_id), role=role, name=agent_id, region="test", backend=backend_hint
         ),
         agent_state=AgentState(agent_id=AgentId(agent_id)),
         inbox_messages=inbox_messages or [],
@@ -110,6 +152,9 @@ class DispatchPolicyPairingTests(unittest.TestCase):
             NaiveConcurrentDispatchPolicy(),
             BarrierDispatchPolicy(),
             CausalOnlyDispatchPolicy(),
+            CapabilityAwareDispatchPolicy(),
+            QueueAwareDispatchPolicy(),
+            FullDispatchPolicy(),
         ]:
             with self.subTest(policy=policy.name):
                 adapter = SynchronousProviderAdapter(_RecordingBackend())
@@ -257,6 +302,74 @@ class CausalOnlyDispatchPolicyWaveTests(unittest.TestCase):
 
         self.assertEqual(len(waves), 1)
         self.assertEqual(len(waves[0]), 2)
+
+
+class CapabilityAwareDispatchPolicyTests(unittest.TestCase):
+    def test_falls_back_to_sequential_when_backend_does_not_support_concurrency(self):
+        backend = _RecordingBackend(capabilities=_capabilities(supports_concurrency=False))
+        adapter = SynchronousProviderAdapter(backend)
+        requests = [_request("agent_a"), _request("agent_b"), _request("agent_c")]
+
+        CapabilityAwareDispatchPolicy().dispatch(requests, adapter)
+
+        self.assertEqual(set(backend.thread_idents), {threading.current_thread().ident})
+
+    def test_dispatches_concurrently_when_backend_supports_concurrency(self):
+        backend = _RecordingBackend(
+            delays={"agent_a": 0.02, "agent_b": 0.02, "agent_c": 0.02},
+            capabilities=_capabilities(supports_concurrency=True),
+        )
+        adapter = SynchronousProviderAdapter(backend)
+        requests = [_request("agent_a"), _request("agent_b"), _request("agent_c")]
+
+        CapabilityAwareDispatchPolicy().dispatch(requests, adapter)
+
+        self.assertGreater(len(set(backend.thread_idents)), 1)
+
+
+class QueueAwareDispatchPolicyTests(unittest.TestCase):
+    def test_peak_concurrency_never_exceeds_the_configured_cap(self):
+        backend = _PeakConcurrencyBackend(delay=0.02)
+        adapter = SynchronousProviderAdapter(backend)
+        requests = [_request(f"agent_{i}") for i in range(6)]
+
+        QueueAwareDispatchPolicy(default_max_in_flight=2).dispatch(requests, adapter)
+
+        self.assertLessEqual(backend.peak_active, 2)
+
+    def test_naive_concurrent_can_exceed_the_same_cap(self):
+        backend = _PeakConcurrencyBackend(delay=0.02)
+        adapter = SynchronousProviderAdapter(backend)
+        requests = [_request(f"agent_{i}") for i in range(6)]
+
+        NaiveConcurrentDispatchPolicy(max_workers=6).dispatch(requests, adapter)
+
+        self.assertGreater(backend.peak_active, 2)
+
+
+class FullDispatchPolicyTests(unittest.TestCase):
+    def test_role_groups_dispatch_one_after_the_other(self):
+        backend = _RecordingBackend(
+            delays={"agent_a1": 0.05},
+            capabilities=_capabilities(supports_concurrency=True),
+        )
+        adapter = SynchronousProviderAdapter(backend)
+        requests = [
+            _request("agent_a1", role="role_a"),
+            _request("agent_a2", role="role_a"),
+            _request("agent_b1", role="role_b"),
+            _request("agent_b2", role="role_b"),
+        ]
+
+        FullDispatchPolicy(default_max_in_flight=4).dispatch(requests, adapter)
+
+        role_a_end = max(
+            end for agent_id, _, end in backend.call_intervals if agent_id in {"agent_a1", "agent_a2"}
+        )
+        role_b_start = min(
+            start for agent_id, start, _ in backend.call_intervals if agent_id in {"agent_b1", "agent_b2"}
+        )
+        self.assertGreaterEqual(role_b_start, role_a_end)
 
 
 if __name__ == "__main__":
