@@ -9,6 +9,7 @@ from agentic_sim.models import (
     EventType,
     ExecutionReceipt,
     PlatformManifest,
+    PlatformTelemetrySample,
     Proposal,
     ValidationResult,
 )
@@ -165,3 +166,27 @@ class ModelTests(unittest.TestCase):
 
         self.assertEqual(manifest.accelerator_count, 1)
         self.assertEqual(manifest.accelerator, "NVIDIA GH200 (1 GPU)")
+
+    def test_platform_telemetry_sample_defaults_to_none_not_fake(self):
+        sample = PlatformTelemetrySample(collected_at="2026-07-29T00:00:00+00:00", source="rocm-smi")
+
+        self.assertIsNone(sample.gpu_utilization_percent)
+        self.assertIsNone(sample.hbm_used_mb)
+        self.assertIsNone(sample.kv_cache_used_percent)
+        self.assertIsNone(sample.preemption_count)
+        self.assertIsNone(sample.queue_depth)
+        self.assertIsNone(sample.error)
+
+        jsonable = to_jsonable(sample)
+        self.assertEqual(jsonable["source"], "rocm-smi")
+        self.assertIsNone(jsonable["energy_joules"])
+
+    def test_platform_telemetry_sample_carries_error_distinct_from_none_fields(self):
+        sample = PlatformTelemetrySample(
+            collected_at="2026-07-29T00:00:00+00:00",
+            source="nvidia-smi",
+            error="nvidia-smi: command not found",
+        )
+
+        self.assertEqual(sample.error, "nvidia-smi: command not found")
+        self.assertIsNone(sample.gpu_utilization_percent)

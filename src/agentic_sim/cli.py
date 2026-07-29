@@ -15,6 +15,8 @@ from agentic_sim.observability import (
     build_run_summary,
     write_run_artifacts,
 )
+from agentic_sim.observability.cuda_collector import CudaTelemetryCollector
+from agentic_sim.observability.rocm_collector import RocmTelemetryCollector
 from agentic_sim.sweep import generate_sweep
 from agentic_sim.utils.env import load_env_files
 from agentic_sim.utils.serialization import to_jsonable
@@ -60,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--self-hosted-max-concurrency", type=int, help="Self-hosted request concurrency"
+    )
+    run.add_argument(
+        "--platform-telemetry",
+        choices=["rocm", "cuda"],
+        help="Poll ROCm/CUDA GPU telemetry once per tick alongside the run",
     )
     run.add_argument("--seed", type=int, help="Seed label for this run (for repeated-trial grouping)")
     run.add_argument("--output", help="Write full run artifact JSON to this path")
@@ -180,6 +187,7 @@ def run_command(args: argparse.Namespace) -> int:
             "max_events_per_tick": args.max_events_per_tick,
             "agent_replicas": args.agent_replicas,
             "seed": args.seed,
+            "platform_telemetry": args.platform_telemetry,
         },
     )
     config.backend_options.update(_aitta_cli_options(args))
@@ -195,6 +203,7 @@ def run_command(args: argparse.Namespace) -> int:
         agent_replicas=config.agent_replicas,
         backend_options=config.backend_options,
     )
+    engine.telemetry_collector = _telemetry_collector_from_name(config.platform_telemetry)
     tick_results = engine.run(config.steps)
     summary = build_run_summary(engine.store)
     payload = {
@@ -220,6 +229,14 @@ def run_command(args: argparse.Namespace) -> int:
         )
     print(json.dumps(payload, indent=2))
     return 0
+
+
+_TELEMETRY_COLLECTORS = {"rocm": RocmTelemetryCollector, "cuda": CudaTelemetryCollector}
+
+
+def _telemetry_collector_from_name(name: str | None):
+    collector_cls = _TELEMETRY_COLLECTORS.get(name)
+    return collector_cls() if collector_cls else None
 
 
 def _aitta_cli_options(args: argparse.Namespace) -> dict[str, object]:

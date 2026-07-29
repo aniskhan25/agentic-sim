@@ -19,6 +19,7 @@ class RuntimeConfig:
     agent_replicas: int = 1
     backend_options: dict[str, Any] = field(default_factory=dict)
     seed: int | None = None
+    platform_telemetry: str | None = None
 
 
 def load_config(path: str | None) -> RuntimeConfig:
@@ -73,6 +74,7 @@ def load_config(path: str | None) -> RuntimeConfig:
         else int(data.get("agent_replicas", 1)),
         backend_options=backend_options,
         seed=data.get("seed"),
+        platform_telemetry=execution.get("platform_telemetry"),
     )
 
 
@@ -89,6 +91,7 @@ def merge_cli(config: RuntimeConfig, overrides: dict[str, Any]) -> RuntimeConfig
         "agent_replicas": config.agent_replicas,
         "backend_options": dict(config.backend_options),
         "seed": config.seed,
+        "platform_telemetry": config.platform_telemetry,
     }
     values.update({key: value for key, value in overrides.items() if value is not None})
     return RuntimeConfig(**values)

@@ -219,6 +219,37 @@ class AggregateRunStatsTests(unittest.TestCase):
             places=5,
         )
 
+    def test_platform_telemetry_mean_aggregates_when_present_and_is_absent_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            gpu_utilization_avgs = [30.0, 40.0, 50.0]
+            for i, avg in enumerate(gpu_utilization_avgs):
+                _write_run(
+                    root,
+                    f"run_{i}",
+                    model="TinyLlama-1.1B-Chat-v1.0",
+                    seed=i,
+                    invalid=10,
+                    guard_messages=2,
+                    guard_actions=1,
+                    latency_avg=1.4,
+                )
+                if i < 2:
+                    _write_json(
+                        root / f"run_{i}" / "platform_telemetry.json",
+                        {"gpu_utilization_percent": {"avg": avg}},
+                    )
+                # run_2 has no platform_telemetry.json at all -- must not crash aggregation.
+
+            payload = aggregate_run_stats(root)
+
+        group = payload["groups"][0]
+        self.assertEqual(group["run_count"], 3)
+        self.assertEqual(group["gpu_utilization_percent_mean"]["count"], 2)
+        self.assertAlmostEqual(
+            group["gpu_utilization_percent_mean"]["mean"], statistics.mean(gpu_utilization_avgs[:2]), places=5
+        )
+
     def test_output_path_writes_json_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

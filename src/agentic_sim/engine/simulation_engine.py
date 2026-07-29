@@ -16,11 +16,12 @@ from agentic_sim.models import (
     ExecutionResult,
     SimulationTickResult,
 )
-from agentic_sim.observability.base import LocalTelemetry, Telemetry
+from agentic_sim.observability.base import LocalTelemetry, Telemetry, TelemetryCollector
 from agentic_sim.scheduling import SchedulerInput
 from agentic_sim.scheduling.base import Scheduler
 from agentic_sim.scheduling.dispatch_policy import DispatchPolicy
 from agentic_sim.state.base import RuntimeStore
+from agentic_sim.utils.serialization import to_jsonable
 
 
 class SimulationEngine:
@@ -35,6 +36,7 @@ class SimulationEngine:
         environment: Environment,
         clock: Clock | None = None,
         telemetry: Telemetry | None = None,
+        telemetry_collector: TelemetryCollector | None = None,
         context_builder: ContextBuilder | None = None,
         batch_builder: BatchBuilder | None = None,
         router: MessageRouter | None = None,
@@ -47,6 +49,7 @@ class SimulationEngine:
         self.environment = environment
         self.clock = clock or SimulationClock.start()
         self.telemetry = telemetry or LocalTelemetry(store.traces)
+        self.telemetry_collector = telemetry_collector
         self.context_builder = context_builder or ContextBuilder()
         self.batch_builder = batch_builder or BatchBuilder()
         self.router = router or MessageRouter()
@@ -199,6 +202,18 @@ class SimulationEngine:
             },
         )
         traces_written += 1
+
+        if self.telemetry_collector is not None:
+            samples = self.telemetry_collector.collect()
+            self.telemetry.record_event(
+                event_name="platform_telemetry",
+                payload={
+                    "tick": self.store.environment.get().tick,
+                    "samples": [to_jsonable(sample) for sample in samples],
+                },
+            )
+            traces_written += 1
+
         self.clock.advance()
         return SimulationTickResult(
             tick=self.store.environment.get().tick,

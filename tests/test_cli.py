@@ -159,6 +159,45 @@ class CliTests(unittest.TestCase):
         self.assertGreaterEqual(payload["summary"]["environment_tick"], 1)
         self.assertGreaterEqual(payload["summary"]["messages"], 1)
 
+    def test_run_command_with_platform_telemetry_writes_platform_telemetry_artifact(self):
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "artifacts"
+
+            with redirect_stdout(StringIO()):
+                exit_code = main(
+                    [
+                        "run",
+                        "--scenario",
+                        "storm",
+                        "--steps",
+                        "1",
+                        "--platform-telemetry",
+                        "rocm",
+                        "--output-dir",
+                        str(output_dir),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            telemetry = json.loads((output_dir / "platform_telemetry.json").read_text())
+            self.assertEqual(telemetry["sample_count"], 1)
+            self.assertEqual(telemetry["sources"], ["rocm-smi"])
+            # No rocm-smi binary on this machine -- collection fails explicitly, run still succeeds.
+            self.assertEqual(telemetry["error_count"], 1)
+
+    def test_run_command_without_platform_telemetry_flag_omits_no_telemetry(self):
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "artifacts"
+
+            with redirect_stdout(StringIO()):
+                exit_code = main(
+                    ["run", "--scenario", "storm", "--steps", "1", "--output-dir", str(output_dir)]
+                )
+
+            self.assertEqual(exit_code, 0)
+            telemetry = json.loads((output_dir / "platform_telemetry.json").read_text())
+            self.assertEqual(telemetry["sample_count"], 0)
+
     def test_check_aitta_reports_missing_credentials(self):
         keys = ["AITTA_API_KEY", "AITTA_BASE_URL", "AITTA_MODEL"]
         old_values = {key: os.environ.get(key) for key in keys}

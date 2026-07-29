@@ -36,6 +36,19 @@ class FakeTelemetry:
         self.events.append((event_name, payload))
 
 
+class FakeTelemetryCollector:
+    """Structurally satisfies the TelemetryCollector port; returns a fixed
+    sample list instead of shelling out to rocm-smi/nvidia-smi."""
+
+    def __init__(self, samples):
+        self.samples = samples
+        self.collect_calls = 0
+
+    def collect(self):
+        self.collect_calls += 1
+        return self.samples
+
+
 class EngineTests(unittest.TestCase):
     def test_storm_engine_runs_and_records_traces(self):
         engine = create_storm_engine()
@@ -145,6 +158,36 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(event_names.count("simulation_tick"), 2)
         # nothing went to the real trace store once telemetry was substituted
         self.assertEqual(len(engine.store.traces.list()), 0)
+
+    def test_telemetry_collector_defaults_to_none_and_existing_behavior_is_unchanged(self):
+        engine = create_storm_engine()
+
+        engine.run(2)
+
+        event_names = [trace.event_name for trace in engine.store.traces.list()]
+        self.assertNotIn("platform_telemetry", event_names)
+
+    def test_telemetry_collector_is_polled_once_per_tick(self):
+        from agentic_sim.models import PlatformTelemetrySample
+
+        engine = create_storm_engine()
+        fake_telemetry = FakeTelemetry()
+        engine.telemetry = fake_telemetry
+        sample = PlatformTelemetrySample(
+            collected_at="2026-07-29T00:00:00+00:00", source="rocm-smi", gpu_utilization_percent=42.0
+        )
+        engine.telemetry_collector = FakeTelemetryCollector([sample])
+
+        engine.run(3)
+
+        telemetry_events = [
+            payload for name, payload in fake_telemetry.events if name == "platform_telemetry"
+        ]
+        self.assertEqual(len(telemetry_events), 3)
+        self.assertEqual(engine.telemetry_collector.collect_calls, 3)
+        ticks = [event["tick"] for event in telemetry_events]
+        self.assertEqual(ticks, sorted(ticks))
+        self.assertEqual(telemetry_events[0]["samples"][0]["gpu_utilization_percent"], 42.0)
 
     def test_local_telemetry_default_path_matches_pre_port_behavior(self):
         engine = create_storm_engine()

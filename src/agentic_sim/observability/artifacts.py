@@ -40,6 +40,7 @@ def write_run_artifacts(
         "traces": path / "traces.json",
         "backend_metrics": path / "backend_metrics.json",
         "causal_verification": path / "causal_verification.json",
+        "platform_telemetry": path / "platform_telemetry.json",
     }
     _write_json(files["metadata"], metadata)
     _write_json(files["config"], _config_snapshot(config))
@@ -49,6 +50,7 @@ def write_run_artifacts(
     _write_json(files["traces"], [to_jsonable(trace) for trace in traces])
     _write_json(files["backend_metrics"], _backend_metrics(traces))
     _write_json(files["causal_verification"], to_jsonable(verify_causal_graph(traces)))
+    _write_json(files["platform_telemetry"], _platform_telemetry(traces))
     return {"run_id": metadata["run_id"], "output_dir": str(path)}
 
 
@@ -63,6 +65,7 @@ def aggregate_run_artifacts(root_dir: str | Path, output_path: str | Path | None
                 "metadata": _read_json(metadata_path),
                 "summary": _read_optional_json(run_dir / "summary.json"),
                 "backend_metrics": _read_optional_json(run_dir / "backend_metrics.json"),
+                "platform_telemetry": _read_optional_json(run_dir / "platform_telemetry.json"),
             }
         )
     payload = {"root_dir": str(root), "runs": runs, "run_count": len(runs)}
@@ -90,6 +93,7 @@ def aggregate_run_stats(root_dir: str | Path, output_path: str | Path | None = N
                 "seed": seed,
                 "run_dir": str(run_dir),
                 "backend_metrics": _read_optional_json(run_dir / "backend_metrics.json") or {},
+                "platform_telemetry": _read_optional_json(run_dir / "platform_telemetry.json") or {},
             }
         )
 
@@ -118,6 +122,16 @@ def aggregate_run_stats(root_dir: str | Path, output_path: str | Path | None = N
             for run in runs
             if run["backend_metrics"].get("useful_agent_steps_per_second") is not None
         ]
+        gpu_utilization_means = [
+            run["platform_telemetry"].get("gpu_utilization_percent", {}).get("avg")
+            for run in runs
+            if run["platform_telemetry"].get("gpu_utilization_percent", {}).get("avg") is not None
+        ]
+        hbm_used_mb_means = [
+            run["platform_telemetry"].get("hbm_used_mb", {}).get("avg")
+            for run in runs
+            if run["platform_telemetry"].get("hbm_used_mb", {}).get("avg") is not None
+        ]
         stats_groups.append(
             {
                 "group_key": key,
@@ -137,6 +151,8 @@ def aggregate_run_stats(root_dir: str | Path, output_path: str | Path | None = N
                 "latency_seconds_mean": _mean_stdev(latency_means),
                 "message_action_autonomy_rate_mean": _mean_stdev(message_action_autonomy_means),
                 "useful_agent_steps_per_second_mean": _mean_stdev(useful_throughputs),
+                "gpu_utilization_percent_mean": _mean_stdev(gpu_utilization_means),
+                "hbm_used_mb_mean": _mean_stdev(hbm_used_mb_means),
                 "runs": [run["run_dir"] for run in runs],
             }
         )
@@ -279,6 +295,43 @@ def _backend_metrics(traces: list[Any]) -> dict[str, Any]:
         "useful_steps": useful_steps,
         "backend_execution_wall_seconds": round(backend_execution_wall_seconds, 6),
         "useful_agent_steps_per_second": useful_agent_steps_per_second,
+    }
+
+
+_PLATFORM_TELEMETRY_NUMERIC_FIELDS = (
+    "gpu_utilization_percent",
+    "hbm_used_mb",
+    "hbm_total_mb",
+    "gpu_power_watts",
+    "energy_joules",
+    "host_cpu_utilization_percent",
+    "kv_cache_used_percent",
+    "preemption_count",
+    "queue_depth",
+)
+
+
+def _platform_telemetry(traces: list[Any]) -> dict[str, Any]:
+    samples: list[dict[str, Any]] = []
+    for trace in traces:
+        if trace.event_name != "platform_telemetry":
+            continue
+        samples.extend(trace.payload.get("samples") or [])
+
+    def stat(key: str) -> dict[str, Any]:
+        values = [s[key] for s in samples if isinstance(s.get(key), (int, float))]
+        return {
+            "count": len(values),
+            "min": min(values) if values else None,
+            "max": max(values) if values else None,
+            "avg": round(sum(values) / len(values), 6) if values else None,
+        }
+
+    return {
+        "sample_count": len(samples),
+        "error_count": sum(1 for s in samples if s.get("error")),
+        "sources": sorted({s["source"] for s in samples if s.get("source")}),
+        **{field: stat(field) for field in _PLATFORM_TELEMETRY_NUMERIC_FIELDS},
     }
 
 

@@ -15,6 +15,7 @@ from agentic_sim.models.execution import (
 )
 from agentic_sim.models.message import Message, MessageType
 from agentic_sim.models.platform_manifest import PlatformManifest
+from agentic_sim.models.platform_telemetry import PlatformTelemetrySample
 from agentic_sim.models.proposal import Proposal
 from agentic_sim.models.receipt import ExecutionReceipt
 from agentic_sim.models.trace import TraceRecord
@@ -43,6 +44,7 @@ __all__ = [
     "Message",
     "MessageType",
     "PlatformManifest",
+    "PlatformTelemetrySample",
     "Proposal",
     "SimulationTickResult",
     "TraceRecord",

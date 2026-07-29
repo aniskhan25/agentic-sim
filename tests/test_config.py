@@ -81,6 +81,29 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.backend_options["self_hosted_timeout"], 45)
         self.assertTrue(config.backend_options["self_hosted_enable_prefix_caching"])
 
+    def test_platform_telemetry_option_loads_from_config(self):
+        with TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "telemetry.json"
+            config_path.write_text(
+                """
+                {
+                  "execution": {
+                    "backend": "mock",
+                    "platform_telemetry": "rocm"
+                  }
+                }
+                """
+            )
+
+            config = load_config(str(config_path))
+
+        self.assertEqual(config.platform_telemetry, "rocm")
+
+    def test_platform_telemetry_defaults_to_none(self):
+        config = load_config(str(Path("configs") / "storm_small.json"))
+
+        self.assertIsNone(config.platform_telemetry)
+
     def test_seed_defaults_to_none(self):
         config = load_config(str(Path("configs") / "storm_small.json"))
 
