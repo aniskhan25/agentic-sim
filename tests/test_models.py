@@ -104,8 +104,32 @@ class ModelTests(unittest.TestCase):
 
         self.assertEqual(manifest.backend_name, "mock")
         self.assertEqual(manifest.accelerator, "none")
+        self.assertIsNone(manifest.accelerator_count)
+        self.assertIsNone(manifest.driver_version)
 
         jsonable = to_jsonable(manifest)
         self.assertEqual(jsonable["backend_name"], "mock")
         self.assertIn("host_architecture", jsonable)
         self.assertIn("python_version", jsonable)
+
+    def test_platform_manifest_for_lumi_fills_known_hardware_constants(self):
+        manifest = PlatformManifest.for_lumi(
+            "vllm",
+            driver_version="ROCm 6.2",
+            serving_runtime_version="0.6.3",
+            placement_level="full_node",
+            manifest_mode="platform_tuned",
+        )
+
+        self.assertEqual(manifest.backend_name, "vllm")
+        self.assertEqual(manifest.accelerator_count, 8)
+        self.assertEqual(manifest.accelerator_memory_gb, 64.0)
+        self.assertEqual(manifest.interconnect, "Slingshot")
+        self.assertEqual(manifest.serving_runtime, "vllm")
+        self.assertEqual(manifest.driver_version, "ROCm 6.2")
+        self.assertEqual(manifest.serving_runtime_version, "0.6.3")
+        self.assertEqual(manifest.placement_level, "full_node")
+        self.assertEqual(manifest.manifest_mode, "platform_tuned")
+
+        jsonable = to_jsonable(manifest)
+        self.assertEqual(jsonable["driver_version"], "ROCm 6.2")
