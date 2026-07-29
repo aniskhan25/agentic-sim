@@ -216,6 +216,21 @@ class QueueAwareDispatchPolicy(CapabilityAwareDispatchPolicy):
     awareness: treating each backend_hint as a provider with a finite
     concurrent-request budget, something rungs 1-5 do not do (they always
     dispatch an entire ready group concurrently, uncapped).
+
+    default_max_in_flight=4 is an evidence-based default, not an arbitrary
+    illustrative one: a real 7-rung pilot against live self-hosted vLLM
+    servers on both LUMI and Roihu (docs/research_roadmap.md item 19) found
+    the original default of 2 caused a statistically real throughput
+    regression relative to capability_aware (rung 5) on both systems. A
+    follow-up sweep over {2, 4, 8} (docs/baseline/b1_retune_sweep_{lumi,roihu}
+    _result.json) found 4 is the smallest value whose useful-agent-steps/sec
+    mean+-1-stdev band overlaps capability_aware's on both systems (2 does
+    not; 4 and 8 both do) -- per docs/hpc_data_collection_procedures.md's
+    tie-breaking rule, the smaller of two statistically-indistinguishable
+    options wins. Note this only retunes queue_aware itself: FullDispatchPolicy
+    (which inherits this default) did NOT improve with a larger cap in the
+    same sweep -- its bottleneck is its own sequential role-group-by-role-group
+    dispatch, a separate mechanism this value does not address.
     """
 
     name = "queue_aware"
@@ -223,7 +238,7 @@ class QueueAwareDispatchPolicy(CapabilityAwareDispatchPolicy):
     def __init__(
         self,
         batch_builder: BatchBuilder | None = None,
-        default_max_in_flight: int = 2,
+        default_max_in_flight: int = 4,
         max_in_flight: dict[str, int] | None = None,
     ):
         self.batch_builder = batch_builder or BatchBuilder()
