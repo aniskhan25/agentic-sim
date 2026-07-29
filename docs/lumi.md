@@ -2,6 +2,27 @@
 
 This demonstrator shows that LUMI can run multi-agent LLM workflows with real simulation semantics: event-driven coordination, role-differentiated agents, structured messaging, and persistent traces. Runs are submitted as standard SLURM jobs; independent simulations scale across array tasks without any distributed runtime.
 
+## First-Time Setup
+
+LUMI home directories have a small quota. The repo checkout, its Python virtual environment, SLURM stdout logs, and every run's artifacts must all live under project scratch (`/scratch/project_462000131/anisrahm`), never under `$HOME`:
+
+```bash
+mkdir -p /scratch/project_462000131/anisrahm
+cd /scratch/project_462000131/anisrahm
+git clone <repo-url> agentic-sim
+cd agentic-sim
+
+module load cray-python
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+cp .env.example .env.local
+# Edit .env.local: AITTA_API_KEY, AITTA_BASE_URL, AITTA_MODEL
+```
+
+Always `sbatch` from this checkout (`cd /scratch/project_462000131/anisrahm/agentic-sim && sbatch scripts/run_lumi.sh ...`) — `SLURM_SUBMIT_DIR` is derived from the directory `sbatch` is invoked from, so submitting from a `$HOME` checkout would defeat this even if the checkout under scratch also exists. `scripts/run_lumi.sh`/`run_lumi_array.sh` already default `ARTIFACT_ROOT` and their `#SBATCH --output` logs to this same scratch path; only `.venv/` location depends on where you actually ran `python3 -m venv` and `git clone` above, which the scripts can't enforce for you.
+
 ## Demo Run
 
 `configs/demo_lumi.json` is the canonical showcase run: a realistic 6-tick Gulf of Finland winter storm, 64 agent replicas (coordinator + hospital/utility operators + forecasters), and the Aitta backend. It demonstrates role-differentiated LLM-backed agents responding to an escalating storm event, coordinating via structured messages, and persisting all decisions and traces to SQLite. The run completes within a 15-minute SLURM time limit.

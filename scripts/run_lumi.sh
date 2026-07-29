@@ -37,14 +37,10 @@ PROJECT_PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 JOB_ID="${SLURM_JOB_ID:-local}"
 CONFIG="${CONFIG:-configs/storm_scale.json}"
 if [[ -z "${ARTIFACT_ROOT:-}" ]]; then
-  if [[ -w "${ROOT_DIR}" ]]; then
-    ARTIFACT_ROOT="${ROOT_DIR}/data"
-  elif [[ -w "$(dirname "${ROOT_DIR}")" ]]; then
-    ARTIFACT_ROOT="$(dirname "${ROOT_DIR}")/agentic-sim-runs"
-  elif [[ -n "${SCRATCH:-}" ]]; then
+  if [[ -n "${SCRATCH:-}" ]]; then
     ARTIFACT_ROOT="${SCRATCH}/agentic-sim-runs"
   else
-    ARTIFACT_ROOT="/tmp/${USER:-agentic-sim}/agentic-sim-runs"
+    ARTIFACT_ROOT="/scratch/project_462000131/anisrahm/agentic-sim-runs"
   fi
 fi
 RUN_DIR="${RUN_DIR:-${ARTIFACT_ROOT}/lumi_run_${JOB_ID}}"
