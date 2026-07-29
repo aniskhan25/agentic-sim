@@ -2,7 +2,7 @@
 
 This document is `docs/research_roadmap.md` item 18: "Freeze common-denominator and platform-tuning procedures before HPC data collection." Its wording, and `evaluation_plan.md`'s Statistical Design bullet ("Freeze workloads, primary contrasts, and configuration-selection **procedures** before primary collection") and B2 ("select configurations through a documented pre-experiment **procedure**" then "**freeze the selected configurations** before collecting primary results"), all draw the same distinction: freezing the *methodology* for choosing a configuration is a separate, earlier act than freezing the *configuration itself*. This document does the former. It is written before any self-hosted backend exists and before any real HPC data has been collected, precisely so the rule can't be quietly shaped by results it hasn't seen yet — the same discipline `docs/scheduler_contribution_gate.md` (item 14) already applied to the scheduler-effect decision gate, reused here rather than reinvented, for a different axis: B1/B2 serving-configuration selection, not scheduler-policy contrasts (those stay exactly as items 12-14 already defined them).
 
-**Scope note, stated plainly**: this freezes *procedures*, not *values*. No self-hosted `ExecutionBackend` exists in code today and no HPC access has produced any data — the actual selected `--tensor-parallel-size`, attention backend, etc. for either system do not exist yet and are not invented here. `docs/lumi_deployment_manifest.md` covers LUMI's concrete B1 configuration and sweep space already; this document does not repeat it, only cross-references it. Roihu has no deployment manifest yet (item 17's open remainder) — where this document needs a Roihu-side sweep space to make the procedure genuinely system-agnostic, it is marked **provisional**, not final.
+**Scope note, stated plainly**: this freezes *procedures*, not *values*. No self-hosted `ExecutionBackend` exists in code today and no HPC access has produced any data — the actual selected `--tensor-parallel-size`, attention backend, etc. for either system do not exist yet and are not invented here. `docs/lumi_deployment_manifest.md` and `docs/roihu_deployment_manifest.md` cover each system's concrete B1 configuration and sweep space already; this document does not repeat them, only cross-references them.
 
 ## Common-denominator mode — frozen procedure
 
@@ -27,12 +27,7 @@ Before any run: for each system, enumerate the serving-runtime features actually
 
 **LUMI**: exactly the space already fixed in `docs/lumi_deployment_manifest.md`'s Platform-tuned configuration section (`--max-num-batched-tokens`, `--max-num-seqs`, `--gpu-memory-utilization`, parallelism strategy, attention backend, KV-cache dtype) — cross-referenced here, not restated.
 
-**Roihu (provisional — no Roihu manifest exists yet, this is a placeholder sweep space to be superseded once one is drafted)**: the CUDA/vLLM-equivalent parameters, structurally mirroring LUMI's space so the two systems' tuning procedures stay comparable:
-- `--max-num-batched-tokens`: same sweep values as LUMI (`8192`/`16384`/`32768`/`65536`) — vLLM's batching knob is identical across ROCm/CUDA builds.
-- `--max-num-seqs`: same sweep values as LUMI (`32`/`64`/`128`/`256`).
-- `--gpu-memory-utilization`: same sweep values as LUMI (`0.85`/`0.90`/`0.95`).
-- Parallelism: independent replicas per GH200 GPU (dense 8B/14B-class models) vs. `--tensor-parallel-size` scaled to Roihu's 4-GPU-per-node topology (so `TP=2`/`TP=4`, not `TP=8` — Roihu has 4 GH200s per node, not 8 GCDs).
-- Attention backend / quantization: CUDA-native equivalents (FlashAttention variants, FP8 KV-cache where supported) — benchmarked, not assumed transferable from AMD's AITER-specific guidance.
+**Roihu**: exactly the space fixed in `docs/roihu_deployment_manifest.md`'s Platform-tuned configuration section — cross-referenced here, not restated. No longer provisional: that manifest was drafted against live-verified Roihu hardware/software facts (SLURM partitions, the CSC-delivered `python-vllm` TYKKY module, confirmed vLLM/PyTorch/CUDA versions), not public documentation alone.
 
 ### Tie-breaking rule
 
@@ -44,6 +39,5 @@ Select once, using the procedure above, **before** collecting any primary result
 
 ## What this does not freeze
 
-- The actual selected configuration values for LUMI or Roihu — neither exists yet; no self-hosted `ExecutionBackend` and no HPC access exist today (see `docs/lumi_deployment_manifest.md`'s Explicit gaps section, unchanged).
-- Roihu's deployment manifest — the sweep space above is provisional scaffolding for this procedure document only, not a substitute for item 17's still-open Roihu half.
+- The actual selected configuration values for LUMI or Roihu — neither exists yet; no self-hosted `ExecutionBackend` and no HPC access exist today (see `docs/lumi_deployment_manifest.md`'s and `docs/roihu_deployment_manifest.md`'s Explicit gaps sections, unchanged).
 - The scheduler-policy contrasts (sequential vs. causal-only, causal-only vs. full) — already frozen by items 12-14; unaffected by this document.

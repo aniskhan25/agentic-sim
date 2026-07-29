@@ -133,3 +133,35 @@ class ModelTests(unittest.TestCase):
 
         jsonable = to_jsonable(manifest)
         self.assertEqual(jsonable["driver_version"], "ROCm 6.2")
+
+    def test_platform_manifest_for_roihu_fills_known_hardware_constants(self):
+        manifest = PlatformManifest.for_roihu(
+            "vllm",
+            driver_version="580.65.06",
+            serving_runtime_version="0.19.1",
+            placement_level="full_node",
+            manifest_mode="platform_tuned",
+        )
+
+        self.assertEqual(manifest.backend_name, "vllm")
+        self.assertEqual(manifest.accelerator_count, 4)
+        self.assertEqual(manifest.accelerator_memory_gb, 96.0)
+        self.assertEqual(manifest.host_architecture, "aarch64")
+        self.assertEqual(manifest.interconnect, "InfiniBand NDR")
+        self.assertEqual(manifest.serving_runtime, "vllm")
+        self.assertEqual(manifest.driver_version, "580.65.06")
+        self.assertEqual(manifest.serving_runtime_version, "0.19.1")
+        self.assertEqual(manifest.placement_level, "full_node")
+        self.assertEqual(manifest.manifest_mode, "platform_tuned")
+
+    def test_platform_manifest_for_roihu_single_device_placement(self):
+        manifest = PlatformManifest.for_roihu(
+            "vllm",
+            driver_version="580.65.06",
+            serving_runtime_version="0.19.1",
+            placement_level="single_device",
+            manifest_mode="common_denominator",
+        )
+
+        self.assertEqual(manifest.accelerator_count, 1)
+        self.assertEqual(manifest.accelerator, "NVIDIA GH200 (1 GPU)")

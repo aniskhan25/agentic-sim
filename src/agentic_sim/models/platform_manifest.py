@@ -62,3 +62,33 @@ class PlatformManifest:
             placement_level=placement_level,
             manifest_mode=manifest_mode,
         )
+
+    @classmethod
+    def for_roihu(
+        cls,
+        backend_name: str,
+        *,
+        driver_version: str,
+        serving_runtime_version: str,
+        placement_level: str,
+        manifest_mode: str,
+        serving_runtime: str = "vllm",
+    ) -> "PlatformManifest":
+        """Roihu hardware constants are fixed (docs/roihu_deployment_manifest.md);
+        run-time-only values (CUDA driver version, serving-runtime version) have
+        no sane default and must be supplied by whoever actually runs on the
+        real cluster, refreshed at deployment time -- never invented here.
+        """
+        return cls(
+            backend_name=backend_name,
+            accelerator="NVIDIA GH200 (1 GPU)" if placement_level == "single_device" else "NVIDIA GH200 (4 GPUs)",
+            host_architecture="aarch64",
+            accelerator_count=1 if placement_level == "single_device" else 4,
+            accelerator_memory_gb=96.0,
+            driver_version=driver_version,
+            serving_runtime=serving_runtime,
+            serving_runtime_version=serving_runtime_version,
+            interconnect="InfiniBand NDR",
+            placement_level=placement_level,
+            manifest_mode=manifest_mode,
+        )

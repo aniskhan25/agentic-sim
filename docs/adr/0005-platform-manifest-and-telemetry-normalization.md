@@ -28,7 +28,7 @@ This ADR does not invent new architecture. It ratifies `evaluation_plan.md`'s al
 
 ## Consequences
 
-- `docs/lumi_deployment_manifest.md` and any future Roihu equivalent are now expected to be expressed in terms of these exact fields, not ad hoc prose.
+- `docs/lumi_deployment_manifest.md` and `docs/roihu_deployment_manifest.md` are now expected to be expressed in terms of these exact fields, not ad hoc prose.
 - No self-hosted `ExecutionBackend` exists yet, so `manifest_mode`/`driver_version`/`serving_runtime_version` are not populated by any real run today — this ADR states the target shape; it does not require building the backend now.
 - Any future code that ranks or compares runs by performance must check `manifest_mode is not None` before treating a run as primary evidence, per the self-hosted/managed-endpoint decision above.
 - This is Proposed, not Accepted — accepting it is a separate, explicit decision, not bundled into drafting it.
