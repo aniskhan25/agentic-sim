@@ -3,6 +3,12 @@ import unittest
 from agentic_sim.engine import create_engine, create_synthetic_engine
 from agentic_sim.observability import graph_metrics, run_kernel_benchmarks, verify
 from agentic_sim.scenarios.synthetic import expected_invariants, step_count_for
+from agentic_sim.scheduling import (
+    BarrierDispatchPolicy,
+    CausalOnlyDispatchPolicy,
+    NaiveConcurrentDispatchPolicy,
+    SequentialDispatchPolicy,
+)
 
 SHAPE_PARAMS = [
     ("chain", {"length": 4}),
@@ -12,6 +18,11 @@ SHAPE_PARAMS = [
     ("mixed_dag", {"length": 3}),
     ("conflicting_write", {"writers": 3}),
 ]
+
+# Shapes with no shared-state contention -- FIFOScheduler still guarantees one
+# activation per agent per tick, and none of these involve environment writes,
+# so every dispatch policy must produce byte-identical results.
+NON_CONFLICT_SHAPE_PARAMS = [item for item in SHAPE_PARAMS if item[0] != "conflicting_write"]
 
 
 class SyntheticKernelShapeTests(unittest.TestCase):
@@ -65,6 +76,26 @@ class SyntheticKernelShapeTests(unittest.TestCase):
     def test_aitta_backend_is_rejected(self):
         with self.assertRaises(ValueError):
             create_synthetic_engine(backend_name="aitta", scenario_parameters={"shape": "chain"})
+
+    def test_all_dispatch_policies_run_identical_workloads_on_non_conflict_shapes(self):
+        policies = [
+            None,
+            SequentialDispatchPolicy(),
+            NaiveConcurrentDispatchPolicy(),
+            BarrierDispatchPolicy(),
+            CausalOnlyDispatchPolicy(),
+        ]
+        for shape, params in NON_CONFLICT_SHAPE_PARAMS:
+            expected = expected_invariants(shape, params)
+            for policy in policies:
+                with self.subTest(shape=shape, policy=policy.name if policy else "default"):
+                    engine = create_synthetic_engine(scenario_parameters={"shape": shape, **params})
+                    engine.dispatch_policy = policy
+                    engine.run(step_count_for(shape, params))
+
+                    traces = engine.store.traces.list()
+                    self.assertEqual(verify(traces).violations, [])
+                    self.assertEqual(graph_metrics(traces), expected)
 
 
 class KernelBenchmarksTests(unittest.TestCase):

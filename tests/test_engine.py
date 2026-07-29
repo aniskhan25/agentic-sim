@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import asdict
 
 from agentic_sim.engine import (
     SCENARIOS,
@@ -6,6 +7,9 @@ from agentic_sim.engine import (
     create_storm_engine,
     create_supply_chain_engine,
 )
+from agentic_sim.observability import build_run_summary
+from agentic_sim.scheduling import SequentialDispatchPolicy
+from agentic_sim.utils.serialization import to_jsonable
 from agentic_sim.utils.time import utc_now
 
 
@@ -73,6 +77,22 @@ class EngineTests(unittest.TestCase):
         self.assertNotIn("result_application_ms", timing)
         for key in ("state_commit_ms", "message_delivery_ms", "tracing_ms"):
             self.assertGreaterEqual(timing[key], 0.0)
+
+    def test_sequential_dispatch_policy_reproduces_the_default_behavior_signature(self):
+        self.assertEqual(self._storm_signature(None), self._storm_signature(SequentialDispatchPolicy()))
+
+    def _storm_signature(self, dispatch_policy):
+        engine = create_storm_engine()
+        engine.dispatch_policy = dispatch_policy
+        ticks = engine.run(5)
+        summary = build_run_summary(engine.store)
+        traces = engine.store.traces.list()
+        return {
+            "ticks": [to_jsonable(tick) for tick in ticks],
+            "summary": to_jsonable(asdict(summary)),
+            "trace_events": [trace.event_name for trace in traces],
+            "final_severity": engine.store.environment.get().variables["severity"],
+        }
 
     def test_engine_factory_selects_registered_scenario(self):
         engine = create_engine(scenario="storm")

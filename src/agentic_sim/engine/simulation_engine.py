@@ -7,11 +7,19 @@ from agentic_sim.engine.clock import Clock, SimulationClock
 from agentic_sim.environment.base import Environment
 from agentic_sim.execution import BatchBuilder, ContextBuilder
 from agentic_sim.execution.base import ExecutionBackend
+from agentic_sim.execution.sync_provider_adapter import SynchronousProviderAdapter
 from agentic_sim.messaging import MessageRouter
-from agentic_sim.models import CommitUnit, Event, ExecutionResult, SimulationTickResult
+from agentic_sim.models import (
+    CommitUnit,
+    DispatchStatus,
+    Event,
+    ExecutionResult,
+    SimulationTickResult,
+)
 from agentic_sim.observability.base import LocalTelemetry, Telemetry
 from agentic_sim.scheduling import SchedulerInput
 from agentic_sim.scheduling.base import Scheduler
+from agentic_sim.scheduling.dispatch_policy import DispatchPolicy
 from agentic_sim.state.base import RuntimeStore
 
 
@@ -31,6 +39,7 @@ class SimulationEngine:
         batch_builder: BatchBuilder | None = None,
         router: MessageRouter | None = None,
         max_events_per_tick: int = 32,
+        dispatch_policy: DispatchPolicy | None = None,
     ):
         self.store = store
         self.scheduler = scheduler
@@ -42,6 +51,8 @@ class SimulationEngine:
         self.batch_builder = batch_builder or BatchBuilder()
         self.router = router or MessageRouter()
         self.max_events_per_tick = max_events_per_tick
+        self.dispatch_policy = dispatch_policy
+        self._async_backend = SynchronousProviderAdapter(backend)
 
     def run(self, steps: int) -> list[SimulationTickResult]:
         return [self.step() for _ in range(steps)]
@@ -87,8 +98,23 @@ class SimulationEngine:
         timings["batching_ms"] = _elapsed_ms(started)
         results: list[ExecutionResult] = []
         started = perf_counter()
-        for batch in batches:
-            results.extend(self.backend.run_batch(batch))
+        if self.dispatch_policy is not None:
+            # Bypasses the pre-split `batches` entirely -- a dispatch policy
+            # decides its own grouping/concurrency over the full tick's
+            # requests (e.g. BarrierDispatchPolicy's own backend_hint
+            # boundaries), rather than reusing an already-homogeneous slice.
+            # FAILED/CANCELLED outcomes are silently skipped (no commit for
+            # that agent this tick) -- failure/retry handling policy is
+            # future work; none of today's backends fail in real scenarios.
+            outcomes = self.dispatch_policy.dispatch(requests, self._async_backend)
+            results = [
+                outcome.result
+                for _, outcome in outcomes
+                if outcome.status == DispatchStatus.COMPLETED
+            ]
+        else:
+            for batch in batches:
+                results.extend(self.backend.run_batch(batch))
         timings["backend_execution_ms"] = _elapsed_ms(started)
 
         emitted_messages = 0
