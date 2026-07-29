@@ -1,12 +1,13 @@
 """
-Run the B1 pilot (roadmap item 19): a bounded, real dispatch-policy
-comparison (sequential vs. full) against a live self-hosted vLLM server,
+Run the B1 pilot (roadmap item 19): a bounded, real comparison across the
+full 7-rung dispatch-policy ladder against a live self-hosted vLLM server,
 using the storm workload and docs/b1_frozen_configuration.md's frozen B1
 decoding/batching values.
 
 This is a pilot, not the primary study -- see docs/b1_frozen_configuration.md
 and docs/hpc_data_collection_procedures.md for the full frozen procedure this
-does not yet run at full scale (10 repeats, all 7 policies, all workloads).
+does not yet run at full scale (all five workload families, both placement
+levels, B2 mode).
 
 Usage (against a live server already started, e.g. via vllm serve):
     python3 scripts/run_b1_pilot.py \
@@ -25,7 +26,26 @@ import json
 
 from agentic_sim.observability.b1_pilot import run_b1_pilot
 from agentic_sim.scenarios.storm import create_storm_engine
-from agentic_sim.scheduling import FullDispatchPolicy, SequentialDispatchPolicy
+from agentic_sim.scheduling import (
+    BarrierDispatchPolicy,
+    CapabilityAwareDispatchPolicy,
+    CausalOnlyDispatchPolicy,
+    FullDispatchPolicy,
+    NaiveConcurrentDispatchPolicy,
+    QueueAwareDispatchPolicy,
+    SequentialDispatchPolicy,
+)
+
+# The full 7-rung policy ladder (research_roadmap.md items 12-13), in ladder order.
+_ALL_DISPATCH_POLICIES = {
+    "sequential": SequentialDispatchPolicy(),
+    "naive_concurrent": NaiveConcurrentDispatchPolicy(),
+    "barrier": BarrierDispatchPolicy(),
+    "causal_only": CausalOnlyDispatchPolicy(),
+    "capability_aware": CapabilityAwareDispatchPolicy(),
+    "queue_aware": QueueAwareDispatchPolicy(),
+    "full": FullDispatchPolicy(),
+}
 
 # docs/b1_frozen_configuration.md's decoding parameters -- OpenAICompatibleExecutionBackend's
 # own existing defaults, reused rather than re-decided.
@@ -71,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
 
     result = run_b1_pilot(
         engine_factory=engine_factory,
-        dispatch_policies={"sequential": SequentialDispatchPolicy(), "full": FullDispatchPolicy()},
+        dispatch_policies=_ALL_DISPATCH_POLICIES,
         repeats=args.repeats,
         steps_per_repeat=args.steps_per_repeat,
         warmup_backend_step_count=args.warmup_backend_step_count,

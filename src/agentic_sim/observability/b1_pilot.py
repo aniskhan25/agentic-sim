@@ -84,7 +84,14 @@ def run_b1_pilot(
             "latency_seconds": _mean_stdev(latency_avgs),
         }
 
-    comparison = _compare_sequential_vs_full(policy_reports)
+    # evaluation_plan.md's two prespecified contrasts ("causal-only versus
+    # sequential", "full ... versus causal-only"), plus full-vs-sequential
+    # for continuity with this pilot's original 2-policy comparison.
+    contrasts = {
+        "causal_only_vs_sequential": _relative_contrast(policy_reports, "sequential", "causal_only"),
+        "full_vs_causal_only": _relative_contrast(policy_reports, "causal_only", "full"),
+        "full_vs_sequential": _relative_contrast(policy_reports, "sequential", "full"),
+    }
 
     payload = {
         "warmup_backend_step_count": warmup_backend_step_count,
@@ -93,7 +100,7 @@ def run_b1_pilot(
         "steps_per_repeat": steps_per_repeat,
         "policies": policy_reports,
         "excluded": excluded,
-        "comparison": comparison,
+        "contrasts": contrasts,
     }
 
     if output_path is not None:
@@ -103,19 +110,19 @@ def run_b1_pilot(
     return payload
 
 
-def _compare_sequential_vs_full(policy_reports: dict[str, Any]) -> dict[str, Any]:
-    if "sequential" not in policy_reports or "full" not in policy_reports:
-        return {"applicable": False, "reason": "requires both 'sequential' and 'full' policy keys"}
+def _relative_contrast(policy_reports: dict[str, Any], baseline_name: str, comparison_name: str) -> dict[str, Any]:
+    if baseline_name not in policy_reports or comparison_name not in policy_reports:
+        return {"applicable": False, "reason": f"requires both {baseline_name!r} and {comparison_name!r} policy keys"}
 
-    sequential = policy_reports["sequential"]["useful_agent_steps_per_second"]
-    full = policy_reports["full"]["useful_agent_steps_per_second"]
-    if sequential["mean"] is None or full["mean"] is None or sequential["mean"] == 0:
+    baseline = policy_reports[baseline_name]["useful_agent_steps_per_second"]
+    comparison = policy_reports[comparison_name]["useful_agent_steps_per_second"]
+    if baseline["mean"] is None or comparison["mean"] is None or baseline["mean"] == 0:
         return {"applicable": True, "reason": "insufficient data", "relative_improvement": None}
 
-    relative_improvement = (full["mean"] - sequential["mean"]) / sequential["mean"]
+    relative_improvement = (comparison["mean"] - baseline["mean"]) / baseline["mean"]
     bands_overlap = not (
-        (full["mean"] - full["stdev"]) > (sequential["mean"] + sequential["stdev"])
-        or (sequential["mean"] - sequential["stdev"]) > (full["mean"] + full["stdev"])
+        (comparison["mean"] - comparison["stdev"]) > (baseline["mean"] + baseline["stdev"])
+        or (baseline["mean"] - baseline["stdev"]) > (comparison["mean"] + comparison["stdev"])
     )
     return {
         "applicable": True,

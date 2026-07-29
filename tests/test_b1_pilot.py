@@ -53,7 +53,7 @@ class B1PilotTests(unittest.TestCase):
         self.assertEqual(result["policies"]["full"]["repeats_completed"], 3)
         self.assertEqual(len(result["policies"]["sequential"]["raw_repetitions"]), 3)
         self.assertEqual(result["excluded"], [])
-        self.assertTrue(result["comparison"]["applicable"])
+        self.assertTrue(result["contrasts"]["full_vs_sequential"]["applicable"])
 
     def test_raising_policy_is_excluded_not_raised(self):
         result = run_b1_pilot(
@@ -87,7 +87,7 @@ class B1PilotTests(unittest.TestCase):
             on_disk = json.load(f)
         self.assertEqual(on_disk, result)
 
-    def test_comparison_requires_both_sequential_and_full_keys(self):
+    def test_contrasts_require_both_relevant_policy_keys(self):
         result = run_b1_pilot(
             engine_factory=_mock_engine_factory,
             dispatch_policies={"sequential": SequentialDispatchPolicy()},
@@ -96,4 +96,6 @@ class B1PilotTests(unittest.TestCase):
             warmup_backend_step_count=5,
         )
 
-        self.assertFalse(result["comparison"]["applicable"])
+        self.assertFalse(result["contrasts"]["full_vs_sequential"]["applicable"])
+        self.assertFalse(result["contrasts"]["causal_only_vs_sequential"]["applicable"])
+        self.assertFalse(result["contrasts"]["full_vs_causal_only"]["applicable"])
