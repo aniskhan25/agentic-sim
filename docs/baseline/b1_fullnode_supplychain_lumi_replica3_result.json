@@ -1,0 +1,824 @@
+{
+  "warmup_backend_step_count": 20,
+  "warmup_backend_steps_observed": 21,
+  "repeats": 3,
+  "steps_per_repeat": 5,
+  "policies": {
+    "sequential": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.615,
+            "max": 8.289,
+            "avg": 3.37
+          },
+          "usage": {
+            "prompt_tokens": 14945,
+            "completion_tokens": 2390,
+            "total_tokens": 17335
+          },
+          "invalid_model_outputs": 15,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 17,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 6,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 70.779857,
+          "useful_agent_steps_per_second": 0.296695
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.612,
+            "max": 8.249,
+            "avg": 3.263
+          },
+          "usage": {
+            "prompt_tokens": 15167,
+            "completion_tokens": 2110,
+            "total_tokens": 17277
+          },
+          "invalid_model_outputs": 17,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 20,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 4,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 68.520344,
+          "useful_agent_steps_per_second": 0.306478
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.606,
+            "max": 8.258,
+            "avg": 4.267
+          },
+          "usage": {
+            "prompt_tokens": 15551,
+            "completion_tokens": 2928,
+            "total_tokens": 18479
+          },
+          "invalid_model_outputs": 17,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 18,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 4,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 89.611452,
+          "useful_agent_steps_per_second": 0.234345
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.279173,
+        "stdev": 0.039129
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 3.633333,
+        "stdev": 0.551373
+      }
+    },
+    "naive_concurrent": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.967,
+            "max": 10.429,
+            "avg": 4.302
+          },
+          "usage": {
+            "prompt_tokens": 15019,
+            "completion_tokens": 1926,
+            "total_tokens": 16945
+          },
+          "invalid_model_outputs": 17,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 19,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 4,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 34.167708,
+          "useful_agent_steps_per_second": 0.614615
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.969,
+            "max": 12.275,
+            "avg": 5.377
+          },
+          "usage": {
+            "prompt_tokens": 15405,
+            "completion_tokens": 2174,
+            "total_tokens": 17579
+          },
+          "invalid_model_outputs": 15,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 18,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 6,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 35.009098,
+          "useful_agent_steps_per_second": 0.599844
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.877,
+            "max": 11.241,
+            "avg": 3.868
+          },
+          "usage": {
+            "prompt_tokens": 14715,
+            "completion_tokens": 1721,
+            "total_tokens": 16436
+          },
+          "invalid_model_outputs": 16,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 18,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 5,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 34.24618,
+          "useful_agent_steps_per_second": 0.613207
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.609222,
+        "stdev": 0.008152
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 4.515667,
+        "stdev": 0.776859
+      }
+    },
+    "barrier": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.739,
+            "max": 11.438,
+            "avg": 4.739
+          },
+          "usage": {
+            "prompt_tokens": 14918,
+            "completion_tokens": 2282,
+            "total_tokens": 17200
+          },
+          "invalid_model_outputs": 17,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 19,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 4,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 38.08559,
+          "useful_agent_steps_per_second": 0.55139
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.952,
+            "max": 10.479,
+            "avg": 5.625
+          },
+          "usage": {
+            "prompt_tokens": 15821,
+            "completion_tokens": 2083,
+            "total_tokens": 17904
+          },
+          "invalid_model_outputs": 19,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 20,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 2,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 37.864912,
+          "useful_agent_steps_per_second": 0.554603
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.738,
+            "max": 10.639,
+            "avg": 4.849
+          },
+          "usage": {
+            "prompt_tokens": 14900,
+            "completion_tokens": 2284,
+            "total_tokens": 17184
+          },
+          "invalid_model_outputs": 15,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 17,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 6,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 38.052412,
+          "useful_agent_steps_per_second": 0.55187
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.552621,
+        "stdev": 0.001733
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 5.071,
+        "stdev": 0.48292
+      }
+    },
+    "causal_only": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.951,
+            "max": 11.897,
+            "avg": 5.135
+          },
+          "usage": {
+            "prompt_tokens": 15322,
+            "completion_tokens": 2298,
+            "total_tokens": 17620
+          },
+          "invalid_model_outputs": 14,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 20,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 7,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 41.945048,
+          "useful_agent_steps_per_second": 0.500655
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.952,
+            "max": 12.32,
+            "avg": 5.214
+          },
+          "usage": {
+            "prompt_tokens": 15340,
+            "completion_tokens": 2256,
+            "total_tokens": 17596
+          },
+          "invalid_model_outputs": 11,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 18,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 10,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 38.610991,
+          "useful_agent_steps_per_second": 0.543887
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.925,
+            "max": 9.223,
+            "avg": 5.184
+          },
+          "usage": {
+            "prompt_tokens": 14629,
+            "completion_tokens": 2488,
+            "total_tokens": 17117
+          },
+          "invalid_model_outputs": 12,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 15,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 9,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 38.462003,
+          "useful_agent_steps_per_second": 0.545993
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.530178,
+        "stdev": 0.02559
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 5.177667,
+        "stdev": 0.039879
+      }
+    },
+    "capability_aware": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 1.021,
+            "max": 10.297,
+            "avg": 5.009
+          },
+          "usage": {
+            "prompt_tokens": 15126,
+            "completion_tokens": 2392,
+            "total_tokens": 17518
+          },
+          "invalid_model_outputs": 13,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 19,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 8,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 39.746947,
+          "useful_agent_steps_per_second": 0.528342
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 1.024,
+            "max": 12.033,
+            "avg": 6.253
+          },
+          "usage": {
+            "prompt_tokens": 15839,
+            "completion_tokens": 2755,
+            "total_tokens": 18594
+          },
+          "invalid_model_outputs": 16,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 20,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 5,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 44.872177,
+          "useful_agent_steps_per_second": 0.467996
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.951,
+            "max": 11.959,
+            "avg": 5.905
+          },
+          "usage": {
+            "prompt_tokens": 15998,
+            "completion_tokens": 2126,
+            "total_tokens": 18124
+          },
+          "invalid_model_outputs": 16,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 19,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 5,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 43.972267,
+          "useful_agent_steps_per_second": 0.477574
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.491304,
+        "stdev": 0.032431
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 5.722333,
+        "stdev": 0.641802
+      }
+    },
+    "queue_aware": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 1.155,
+            "max": 12.676,
+            "avg": 5.163
+          },
+          "usage": {
+            "prompt_tokens": 14552,
+            "completion_tokens": 2565,
+            "total_tokens": 17117
+          },
+          "invalid_model_outputs": 11,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 13,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 10,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 37.687103,
+          "useful_agent_steps_per_second": 0.55722
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 1.371,
+            "max": 12.307,
+            "avg": 4.802
+          },
+          "usage": {
+            "prompt_tokens": 15322,
+            "completion_tokens": 1776,
+            "total_tokens": 17098
+          },
+          "invalid_model_outputs": 15,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 20,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 6,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 38.477111,
+          "useful_agent_steps_per_second": 0.545779
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.982,
+            "max": 12.544,
+            "avg": 4.747
+          },
+          "usage": {
+            "prompt_tokens": 14738,
+            "completion_tokens": 2225,
+            "total_tokens": 16963
+          },
+          "invalid_model_outputs": 14,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 16,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 7,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 38.513276,
+          "useful_agent_steps_per_second": 0.545267
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.549422,
+        "stdev": 0.006758
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 4.904,
+        "stdev": 0.22598
+      }
+    },
+    "full": {
+      "repeats_completed": 3,
+      "raw_repetitions": [
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 1.086,
+            "max": 11.206,
+            "avg": 4.54
+          },
+          "usage": {
+            "prompt_tokens": 14541,
+            "completion_tokens": 2145,
+            "total_tokens": 16686
+          },
+          "invalid_model_outputs": 15,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 16,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 6,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 35.251489,
+          "useful_agent_steps_per_second": 0.59572
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.987,
+            "max": 13.26,
+            "avg": 6.062
+          },
+          "usage": {
+            "prompt_tokens": 15062,
+            "completion_tokens": 2952,
+            "total_tokens": 18014
+          },
+          "invalid_model_outputs": 17,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 17,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 4,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 39.87047,
+          "useful_agent_steps_per_second": 0.526706
+        },
+        {
+          "backend_steps": 21,
+          "latency_seconds": {
+            "count": 21,
+            "min": 0.988,
+            "max": 12.012,
+            "avg": 4.97
+          },
+          "usage": {
+            "prompt_tokens": 14528,
+            "completion_tokens": 2712,
+            "total_tokens": 17240
+          },
+          "invalid_model_outputs": 13,
+          "policy_guard_added_messages": 24,
+          "policy_guard_added_actions": 11,
+          "json_repair_attempts": 17,
+          "must_not_violations": 0,
+          "bounded_violations": 0,
+          "cardinality_violations": 0,
+          "state_mutation_violations": 0,
+          "semantic_valid_count": 8,
+          "message_action_autonomy_rate": {
+            "count": 21,
+            "min": 0.0,
+            "max": 0.0,
+            "avg": 0.0
+          },
+          "message_action_autonomy_unavailable_steps": 0,
+          "useful_steps": 21,
+          "backend_execution_wall_seconds": 39.98839,
+          "useful_agent_steps_per_second": 0.525152
+        }
+      ],
+      "useful_agent_steps_per_second": {
+        "count": 3,
+        "mean": 0.549193,
+        "stdev": 0.040301
+      },
+      "latency_seconds": {
+        "count": 3,
+        "mean": 5.190667,
+        "stdev": 0.784628
+      }
+    }
+  },
+  "excluded": [],
+  "contrasts": {
+    "causal_only_vs_sequential": {
+      "applicable": true,
+      "relative_improvement": 0.8991,
+      "bands_overlap": false
+    },
+    "full_vs_causal_only": {
+      "applicable": true,
+      "relative_improvement": 0.0359,
+      "bands_overlap": true
+    },
+    "full_vs_sequential": {
+      "applicable": true,
+      "relative_improvement": 0.9672,
+      "bands_overlap": false
+    }
+  }
+}

@@ -572,6 +572,16 @@ Roihu's first attempt (4 replicas) succeeded cleanly on the first try: zero excl
 | causal_only | 5.65 | 2.95 |
 | full | 6.22 | 2.68 |
 
-Roihu's aggregate mirrors its single-device story (`full` ≥ `causal_only`); LUMI's aggregate shows `full` modestly below `causal_only` (-9.2%) — but at only 3 reps/replica this is a point estimate, not a statistically tested contrast, and plausibly noise rather than a real regression (unlike the earlier, statistically confirmed 10-rep regressions this session already found and fixed). Raw data: `docs/baseline/b1_fullnode_{lumi,roihu}_replica{N}_result.json` (4 files, Roihu; 8 files, LUMI). **Still fully open**: full-node placement has now been proven feasible and measured once on both systems, but only at pilot scale (3 reps, 1 workload) — the confirmatory 10-rep scale at full-node, `supply_chain` at full-node, and everything else already logged as open (the three real-LLM-blocked workload families, B2 mode) remain future work.
+Roihu's aggregate mirrors its single-device story (`full` ≥ `causal_only`); LUMI's aggregate shows `full` modestly below `causal_only` (-9.2%) — but at only 3 reps/replica this is a point estimate, not a statistically tested contrast, and plausibly noise rather than a real regression (unlike the earlier, statistically confirmed 10-rep regressions this session already found and fixed). Raw data: `docs/baseline/b1_fullnode_{lumi,roihu}_replica{N}_result.json` (4 files, Roihu; 8 files, LUMI).
+
+**`supply_chain` at full-node scale, both systems**: the same job mechanism, unmodified except the scenario name — reused the already-proven orchestration (including LUMI's 15-minute health-check fix) with zero new issues on either system this time. Both runs clean: zero exclusions across all 4 (Roihu) + 8 (LUMI) replicas, per-replica numbers consistent with `supply_chain`'s established single-device baseline on both systems.
+
+| policy | Roihu (4 GH200s) | LUMI (8 MI250X GCDs) |
+|---|---|---|
+| sequential | 3.14 | 2.28 |
+| causal_only | 6.55 | 4.46 |
+| full | 6.59 | 3.98 |
+
+Same qualitative pattern as `storm`'s full-node result: Roihu's aggregate has `full` ≈ `causal_only`; LUMI's aggregate has `full` modestly below `causal_only` (-10.7%) — again a 3-rep/replica point estimate, not a statistically tested contrast, consistent with (not necessarily confirming) the same mild LUMI-side gap seen in `storm`'s full-node data. Raw data: `docs/baseline/b1_fullnode_supplychain_{lumi,roihu}_replica{N}_result.json`. **Still fully open**: the confirmatory 10-rep scale at full-node (both workloads now measured once at pilot scale, neither at confirmatory scale), and everything else already logged as open (the three real-LLM-blocked workload families, B2 mode) remain future work.
 
 `docs/lumi_deployment_manifest.md`'s Serving stack section is updated with this real container path and the `SINGULARITYENV_` gotcha. **Still explicitly open**: the actual matched two-system study (both systems, the real 8B/70B model, the frozen 10-repetition `docs/hpc_data_collection_procedures.md` procedure, common-denominator/platform-tuned configurations, artifact-backed tables/figures) has not started — these were two small, ad hoc, unrepeated runs proving the wiring works end to end on each system, not primary evidence collection.
