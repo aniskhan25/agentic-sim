@@ -1,8 +1,12 @@
 """
 Run the B1 pilot (roadmap item 19): a bounded, real comparison across the
 full 7-rung dispatch-policy ladder against a live self-hosted vLLM server,
-using the storm workload and docs/b1_frozen_configuration.md's frozen B1
-decoding/batching values.
+using the storm or supply_chain workload and docs/b1_frozen_configuration.md's
+frozen B1 decoding/batching values. deterministic_kernel/synthetic dependency
+graphs/failure workloads are not selectable here -- create_synthetic_engine
+hard-rejects any real backend and its agents carry no natural-language
+prompts, a separate unresolved prerequisite (see docs/research_roadmap.md
+item 19).
 
 This is a pilot, not the primary study -- see docs/b1_frozen_configuration.md
 and docs/hpc_data_collection_procedures.md for the full frozen procedure this
@@ -26,6 +30,7 @@ import json
 
 from agentic_sim.observability.b1_pilot import run_b1_pilot
 from agentic_sim.scenarios.storm import create_storm_engine
+from agentic_sim.scenarios.supply_chain import create_supply_chain_engine
 from agentic_sim.scheduling import (
     BarrierDispatchPolicy,
     CapabilityAwareDispatchPolicy,
@@ -58,6 +63,7 @@ _FROZEN_MAX_CONTEXT_TOKENS = 8192
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--backend", choices=["mock", "self_hosted"], default="self_hosted")
+    parser.add_argument("--scenario", choices=["storm", "supply_chain"], default="storm")
     parser.add_argument("--self-hosted-base-url")
     parser.add_argument("--self-hosted-model")
     parser.add_argument("--self-hosted-timeout", type=float, default=60.0)
@@ -99,8 +105,10 @@ def main(argv: list[str] | None = None) -> int:
             "self_hosted_max_context_tokens": _FROZEN_MAX_CONTEXT_TOKENS,
         }
 
+    scenario_factory = create_storm_engine if args.scenario == "storm" else create_supply_chain_engine
+
     def engine_factory():
-        return create_storm_engine(backend_name=args.backend, backend_options=backend_options)
+        return scenario_factory(backend_name=args.backend, backend_options=backend_options)
 
     result = run_b1_pilot(
         engine_factory=engine_factory,
