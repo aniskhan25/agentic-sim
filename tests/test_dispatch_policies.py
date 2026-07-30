@@ -348,9 +348,18 @@ class QueueAwareDispatchPolicyTests(unittest.TestCase):
 
 
 class FullDispatchPolicyTests(unittest.TestCase):
-    def test_role_groups_dispatch_one_after_the_other(self):
+    def test_role_groups_dispatch_concurrently_not_serialized(self):
+        # A real 7-rung B1 pilot against live self-hosted vLLM servers on both
+        # LUMI and Roihu (docs/research_roadmap.md item 19) found `full`
+        # collapsing to near-sequential throughput: dispatching each role
+        # group through its own blocking concurrent call, one after another,
+        # serialized execution across roles whenever a role had few
+        # concurrent requests per wave. Role-adjacency is now preserved only
+        # as dispatch *order*, not as a blocking boundary between groups --
+        # this test proves role_b (fast) is no longer forced to wait for
+        # role_a's (slow) group to fully drain first.
         backend = _RecordingBackend(
-            delays={"agent_a1": 0.05},
+            delays={"agent_a1": 0.05, "agent_a2": 0.05},
             capabilities=_capabilities(supports_concurrency=True),
         )
         adapter = SynchronousProviderAdapter(backend)
@@ -366,10 +375,13 @@ class FullDispatchPolicyTests(unittest.TestCase):
         role_a_end = max(
             end for agent_id, _, end in backend.call_intervals if agent_id in {"agent_a1", "agent_a2"}
         )
-        role_b_start = min(
-            start for agent_id, start, _ in backend.call_intervals if agent_id in {"agent_b1", "agent_b2"}
+        role_b_end = max(
+            end for agent_id, _, end in backend.call_intervals if agent_id in {"agent_b1", "agent_b2"}
         )
-        self.assertGreaterEqual(role_b_start, role_a_end)
+        # role_b has no delay, so it finishes almost immediately -- well
+        # before role_a's 0.05s delay elapses -- only if the two role groups
+        # actually run concurrently rather than role_b waiting its turn.
+        self.assertLess(role_b_end, role_a_end)
 
 
 if __name__ == "__main__":

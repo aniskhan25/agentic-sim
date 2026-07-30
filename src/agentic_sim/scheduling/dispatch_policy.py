@@ -260,23 +260,34 @@ class FullDispatchPolicy(QueueAwareDispatchPolicy):
     approximates Phase 6's own "prefix or role similarity" wording via
     AgentProfile.role -- requests sharing a role share the same
     role_policy-driven prompt template and are the most likely to share a
-    reusable prefix in practice. Within each capability/queue-aware group,
-    requests are further split by role and dispatched role-group by
-    role-group, so a real prefix-caching-capable backend would see
-    same-role requests submitted adjacently. Real token/prompt-level
+    reusable prefix in practice. Same-role requests are reordered to be
+    adjacent in dispatch order, so a real prefix-caching-capable backend
+    would see them submitted next to each other. Real token/prompt-level
     prefix similarity is deferred as premature -- no backend could exploit
     it yet.
+
+    Dispatching each role group through its own blocking concurrent call
+    (one ThreadPoolExecutor per role, waiting for it to fully drain before
+    starting the next) was tried first and found, via a real 7-rung B1
+    pilot against live self-hosted vLLM servers on both LUMI and Roihu
+    (docs/research_roadmap.md item 19), to serialize execution across
+    roles -- pathological whenever a role has few concurrent requests per
+    wave (e.g. one agent per role), collapsing this policy to near-
+    sequential throughput. Fixed by reordering role-adjacent but
+    dispatching the whole group as a single concurrent batch (inherited
+    from QueueAwareDispatchPolicy's dispatch()), preserving the ordering
+    property the docstring actually needs without the accidental blocking.
     """
 
     name = "full"
 
-    def dispatch(self, requests, backend):
-        results = []
-        for wave in build_causal_waves(requests):
-            for group in self.batch_builder.group(wave):
-                for role_group in self._group_by_role(group):
-                    results.extend(self._dispatch_group(role_group, backend))
-        return results
+    def _dispatch_group(self, group, backend):
+        if not backend.capabilities.supports_concurrency:
+            return SequentialDispatchPolicy().dispatch(group, backend)
+        hint = group[0].backend_hint
+        limit = self.max_in_flight.get(hint, self.default_max_in_flight)
+        role_ordered = [request for role_group in self._group_by_role(group) for request in role_group]
+        return NaiveConcurrentDispatchPolicy(max_workers=max(1, limit)).dispatch(role_ordered, backend)
 
     def _group_by_role(self, requests: list[ExecutionRequest]) -> list[list[ExecutionRequest]]:
         grouped: dict[str, list[ExecutionRequest]] = {}
