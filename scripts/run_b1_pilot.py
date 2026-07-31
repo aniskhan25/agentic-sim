@@ -82,6 +82,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--steps-per-repeat", type=int, default=5)
     parser.add_argument("--warmup-backend-step-count", type=int, default=20)
+    parser.add_argument(
+        "--policies",
+        help=(
+            "Comma-separated subset of the 7-rung ladder to run (default: all 7). "
+            f"Choices: {', '.join(_ALL_DISPATCH_POLICIES)}. E.g. --policies causal_only "
+            "for a B2 serving-config sweep, which holds the scheduling policy fixed."
+        ),
+    )
     parser.add_argument("--output", help="Write the full JSON result to this path")
     return parser
 
@@ -110,9 +118,18 @@ def main(argv: list[str] | None = None) -> int:
     def engine_factory():
         return scenario_factory(backend_name=args.backend, backend_options=backend_options)
 
+    if args.policies:
+        requested = [name.strip() for name in args.policies.split(",")]
+        unknown = [name for name in requested if name not in _ALL_DISPATCH_POLICIES]
+        if unknown:
+            raise SystemExit(f"unknown --policies value(s) {unknown}; choices: {list(_ALL_DISPATCH_POLICIES)}")
+        dispatch_policies = {name: _ALL_DISPATCH_POLICIES[name] for name in requested}
+    else:
+        dispatch_policies = _ALL_DISPATCH_POLICIES
+
     result = run_b1_pilot(
         engine_factory=engine_factory,
-        dispatch_policies=_ALL_DISPATCH_POLICIES,
+        dispatch_policies=dispatch_policies,
         repeats=args.repeats,
         steps_per_repeat=args.steps_per_repeat,
         warmup_backend_step_count=args.warmup_backend_step_count,
