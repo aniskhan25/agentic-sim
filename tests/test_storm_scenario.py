@@ -2,7 +2,7 @@ import unittest
 
 from agentic_sim.environment import StormEnvironment
 from agentic_sim.engine import create_storm_engine
-from agentic_sim.models import EventType
+from agentic_sim.models import EnvironmentAction, EventType
 from agentic_sim.observability import build_run_summary
 from agentic_sim.utils.time import utc_now
 
@@ -27,6 +27,22 @@ class StormScenarioTests(unittest.TestCase):
 
         event_types = [event.event_type for event in second.emitted_events]
         self.assertIn(EventType.STORM_OUTAGE, event_types)
+
+    def test_malformed_adjust_capacity_action_is_ignored_not_a_crash(self):
+        environment = StormEnvironment()
+        state = environment.initialize()
+
+        transition = environment.apply_actions(
+            state,
+            [
+                EnvironmentAction(action_type="adjust_capacity", payload={"delta": -10}),
+                EnvironmentAction(
+                    action_type="adjust_capacity", payload={"region": environment.regions[0]}
+                ),
+            ],
+        )
+
+        self.assertEqual(transition.state.variables["capacity"][environment.regions[0]], 100)
 
     def test_tick_and_apply_actions_increment_environment_version(self):
         environment = StormEnvironment()

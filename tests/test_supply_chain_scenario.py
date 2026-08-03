@@ -34,6 +34,20 @@ class SupplyChainScenarioTests(unittest.TestCase):
 
         self.assertEqual(transition.state.variables["inventory"]["helsinki"], 95)
 
+    def test_malformed_adjust_inventory_action_is_ignored_not_a_crash(self):
+        environment = SupplyChainEnvironment()
+        state = environment.initialize()
+
+        transition = environment.apply_actions(
+            state,
+            [
+                EnvironmentAction(action_type="adjust_inventory", payload={"delta": -25}),
+                EnvironmentAction(action_type="adjust_inventory", payload={"region": "helsinki"}),
+            ],
+        )
+
+        self.assertEqual(transition.state.variables["inventory"]["helsinki"], 120)
+
     def test_tick_and_apply_actions_increment_environment_version(self):
         environment = SupplyChainEnvironment()
         state = environment.initialize()

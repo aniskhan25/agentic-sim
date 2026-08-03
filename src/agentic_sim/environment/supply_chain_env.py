@@ -67,16 +67,18 @@ class SupplyChainEnvironment:
                     "summary", variables.get("last_summary", "")
                 )
             elif action.action_type == "adjust_inventory":
+                region = action.payload.get("region")
+                if region is None:
+                    continue
                 inventory = dict(variables.get("inventory", {}))
-                region = action.payload["region"]
                 inventory[region] = max(
-                    0, int(inventory.get(region, 0)) + int(action.payload["delta"])
+                    0, int(inventory.get(region, 0)) + int(action.payload.get("delta", 0))
                 )
                 variables["inventory"] = inventory
             elif action.action_type == "adjust_transport_capacity":
                 variables["transport_capacity"] = max(
                     0,
-                    int(variables.get("transport_capacity", 0)) + int(action.payload["delta"]),
+                    int(variables.get("transport_capacity", 0)) + int(action.payload.get("delta", 0)),
                 )
         return EnvironmentTransitionResult(
             state=EnvironmentState(

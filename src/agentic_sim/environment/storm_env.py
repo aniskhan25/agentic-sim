@@ -57,9 +57,11 @@ class StormEnvironment:
             if action.action_type == "update_summary":
                 variables["last_summary"] = action.payload.get("summary", variables.get("last_summary", ""))
             elif action.action_type == "adjust_capacity":
+                region = action.payload.get("region")
+                if region is None:
+                    continue
                 capacity = dict(variables.get("capacity", {}))
-                region = action.payload["region"]
-                capacity[region] = max(0, int(capacity.get(region, 100)) + int(action.payload["delta"]))
+                capacity[region] = max(0, int(capacity.get(region, 100)) + int(action.payload.get("delta", 0)))
                 variables["capacity"] = capacity
         return EnvironmentTransitionResult(
             state=EnvironmentState(
