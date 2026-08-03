@@ -1,0 +1,1 @@
+[{"value": "default", "useful_agent_steps_per_second": {"count": 3, "mean": 0.216718, "stdev": 0.005106}, "had_preemption": false}, {"value": "fp8_e4m3", "useful_agent_steps_per_second": {"count": 3, "mean": 0.412526, "stdev": 0.033328}, "had_preemption": false}]

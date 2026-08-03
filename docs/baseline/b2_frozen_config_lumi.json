@@ -1,0 +1,8 @@
+{
+  "system": "lumi",
+  "max_num_batched_tokens": 8192,
+  "max_num_seqs": 32,
+  "gpu_memory_utilization": 0.9,
+  "attention_backend": "baseline",
+  "kv_cache_dtype": "fp8_e4m3"
+}

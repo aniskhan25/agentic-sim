@@ -1,0 +1,232 @@
+[
+  {
+    "dimension": "max_num_batched_tokens",
+    "candidates": [
+      {
+        "value": 8192,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.352536,
+          "stdev": 0.034543
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 16384,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.348064,
+          "stdev": 0.053064
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 32768,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.337179,
+          "stdev": 0.033502
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 65536,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.368901,
+          "stdev": 0.030312
+        },
+        "had_preemption": false
+      }
+    ],
+    "selection": {
+      "winner": 8192,
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [
+        8192,
+        16384,
+        32768,
+        65536
+      ],
+      "tied": [
+        8192,
+        16384,
+        32768,
+        65536
+      ]
+    }
+  },
+  {
+    "dimension": "max_num_seqs",
+    "candidates": [
+      {
+        "value": 32,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.386509,
+          "stdev": 0.032076
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 64,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.397572,
+          "stdev": 0.041614
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 128,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.409594,
+          "stdev": 0.006086
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 256,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.418321,
+          "stdev": 0.091323
+        },
+        "had_preemption": false
+      }
+    ],
+    "selection": {
+      "winner": 32,
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [
+        32,
+        64,
+        128,
+        256
+      ],
+      "tied": [
+        32,
+        64,
+        128,
+        256
+      ]
+    }
+  },
+  {
+    "dimension": "gpu_memory_utilization",
+    "candidates": [
+      {
+        "value": 0.85,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.337476,
+          "stdev": 0.039693
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 0.9,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.406603,
+          "stdev": 0.038029
+        },
+        "had_preemption": false
+      },
+      {
+        "value": 0.95,
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.481775,
+          "stdev": 0.080669
+        },
+        "had_preemption": false
+      }
+    ],
+    "selection": {
+      "winner": 0.9,
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [
+        0.85,
+        0.9,
+        0.95
+      ],
+      "tied": [
+        0.9,
+        0.95
+      ]
+    }
+  },
+  {
+    "dimension": "attention_backend",
+    "candidates": [
+      {
+        "value": "baseline",
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.355362,
+          "stdev": 0.029433
+        },
+        "had_preemption": false
+      },
+      {
+        "value": "aiter",
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.356152,
+          "stdev": 0.030602
+        },
+        "had_preemption": false
+      }
+    ],
+    "selection": {
+      "winner": "baseline",
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [
+        "baseline",
+        "aiter"
+      ],
+      "tied": [
+        "baseline",
+        "aiter"
+      ]
+    }
+  },
+  {
+    "dimension": "kv_cache_dtype",
+    "candidates": [
+      {
+        "value": "default",
+        "useful_agent_steps_per_second": {
+          "mean": null,
+          "stdev": null
+        },
+        "had_preemption": false,
+        "error": "pilot_failed"
+      },
+      {
+        "value": "fp8_e4m3",
+        "useful_agent_steps_per_second": {
+          "count": 3,
+          "mean": 0.40998,
+          "stdev": 0.022456
+        },
+        "had_preemption": false
+      }
+    ],
+    "selection": {
+      "winner": "fp8_e4m3",
+      "reason": "clear winner: highest mean, no overlapping bands",
+      "disqualified": [],
+      "eligible": [
+        "fp8_e4m3"
+      ],
+      "tied": []
+    }
+  }
+]
