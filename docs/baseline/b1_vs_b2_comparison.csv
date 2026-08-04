@@ -1,0 +1,5 @@
+system,workload,b1_mean,b1_stdev,b1_count,b2_mean,b2_stdev,b2_count,relative_improvement,bands_overlap
+lumi,storm,0.3621,0.0357,10,0.3789,0.0411,10,0.0462,True
+lumi,supply_chain,0.3199,0.183,10,0.5108,0.0776,10,0.5968,True
+roihu,storm,1.5529,0.4122,10,1.4511,0.3515,10,-0.0655,True
+roihu,supply_chain,1.7215,0.1643,10,1.9088,0.322,10,0.1088,True

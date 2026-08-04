@@ -1,0 +1,111 @@
+"""
+Compare B1 (common-denominator) vs. B2 (platform-tuned) real confirmatory
+results (roadmap item 19) -- the first real "does platform-tuning actually
+help" evidence, now that both `docs/b1_frozen_configuration.md` and
+`docs/b2_frozen_configuration.md` exist. `causal_only` policy only (isolating
+the serving-config effect from the already-settled policy-ladder question),
+`storm` + `supply_chain`, single-device, 10 reps -- see the approved plan for
+the full scope statement.
+
+Reuses `agentic_sim.observability.b1_pilot._relative_contrast` unmodified --
+the exact same relative-improvement/bands-overlap math already used for
+every other contrast this session, applied here to two serving configs
+instead of two dispatch policies.
+
+The manifest below is hand-written and explicit, matching
+`scripts/aggregate_b1_results.py`'s own precedent -- the JSON payloads carry
+no system/workload/config metadata of their own.
+
+Usage:
+    python3 scripts/aggregate_b1_vs_b2_results.py
+
+Regenerates:
+    docs/baseline/b1_vs_b2_comparison.csv / .md
+"""
+from __future__ import annotations
+
+import csv
+import json
+from pathlib import Path
+from typing import Any
+
+from agentic_sim.observability.b1_pilot import _relative_contrast
+
+_BASELINE_DIR = Path(__file__).resolve().parent.parent / "docs" / "baseline"
+
+_MANIFEST: list[dict[str, str]] = [
+    {"system": "lumi", "workload": "storm",
+     "b1_file": "b1_vs_b2_lumi_b1_storm_result.json", "b2_file": "b1_vs_b2_lumi_b2_storm_result.json"},
+    {"system": "lumi", "workload": "supply_chain",
+     "b1_file": "b1_vs_b2_lumi_b1_supply_chain_result.json", "b2_file": "b1_vs_b2_lumi_b2_supply_chain_result.json"},
+    {"system": "roihu", "workload": "storm",
+     "b1_file": "b1_vs_b2_roihu_b1_storm_result.json", "b2_file": "b1_vs_b2_roihu_b2_storm_result.json"},
+    {"system": "roihu", "workload": "supply_chain",
+     "b1_file": "b1_vs_b2_roihu_b1_supply_chain_result.json", "b2_file": "b1_vs_b2_roihu_b2_supply_chain_result.json"},
+]
+
+
+def _load_causal_only(filename: str) -> dict[str, Any]:
+    payload = json.loads((_BASELINE_DIR / filename).read_text())
+    return payload["policies"]["causal_only"]
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        path.write_text("")
+        return
+    fieldnames = list(rows[0].keys())
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_markdown_table(path: Path, rows: list[dict[str, Any]], title: str) -> None:
+    if not rows:
+        path.write_text(f"# {title}\n\nNo rows.\n")
+        return
+    fieldnames = list(rows[0].keys())
+    lines = [f"# {title}", "", "| " + " | ".join(fieldnames) + " |", "| " + " | ".join("---" for _ in fieldnames) + " |"]
+    for row in rows:
+        lines.append("| " + " | ".join(str(row[f]) for f in fieldnames) + " |")
+    path.write_text("\n".join(lines) + "\n")
+
+
+def _round(value: Any) -> Any:
+    return round(value, 4) if isinstance(value, float) else value
+
+
+def main() -> int:
+    rows: list[dict[str, Any]] = []
+    for item in _MANIFEST:
+        b1_report = _load_causal_only(item["b1_file"])
+        b2_report = _load_causal_only(item["b2_file"])
+        synthetic = {"b1": b1_report, "b2": b2_report}
+        contrast = _relative_contrast(synthetic, "b1", "b2")
+        b1_stats = b1_report["useful_agent_steps_per_second"]
+        b2_stats = b2_report["useful_agent_steps_per_second"]
+        rows.append(
+            {
+                "system": item["system"],
+                "workload": item["workload"],
+                "b1_mean": _round(b1_stats["mean"]),
+                "b1_stdev": _round(b1_stats["stdev"]),
+                "b1_count": b1_stats["count"],
+                "b2_mean": _round(b2_stats["mean"]),
+                "b2_stdev": _round(b2_stats["stdev"]),
+                "b2_count": b2_stats["count"],
+                "relative_improvement": _round(contrast.get("relative_improvement")),
+                "bands_overlap": contrast.get("bands_overlap"),
+            }
+        )
+
+    _write_csv(_BASELINE_DIR / "b1_vs_b2_comparison.csv", rows)
+    _write_markdown_table(_BASELINE_DIR / "b1_vs_b2_comparison.md", rows, "B1 vs. B2 Comparison (causal_only, 10 reps)")
+
+    print(f"wrote {len(rows)} rows")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
