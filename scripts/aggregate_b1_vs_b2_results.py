@@ -4,15 +4,20 @@ results (roadmap item 19) -- the first real "does platform-tuning actually
 help" evidence, now that both `docs/b1_frozen_configuration.md` and
 `docs/b2_frozen_configuration.md` exist. `causal_only` policy only (isolating
 the serving-config effect from the already-settled policy-ladder question),
-`storm` + `supply_chain`, single-device, 10 reps -- see the approved plan for
-the full scope statement.
+`storm` + `supply_chain`, single-device -- see the approved plan for the full
+scope statement.
+
+Two repetition counts are aggregated: 10 reps (the original confirmatory
+run) and 30 reps (a follow-up rerun, after the 10-rep run showed no
+statistically distinguishable difference anywhere -- 30 reps tests whether
+that was a real null result or just noise too large at n=10 to resolve).
 
 Reuses `agentic_sim.observability.b1_pilot._relative_contrast` unmodified --
 the exact same relative-improvement/bands-overlap math already used for
 every other contrast this session, applied here to two serving configs
 instead of two dispatch policies.
 
-The manifest below is hand-written and explicit, matching
+The manifests below are hand-written and explicit, matching
 `scripts/aggregate_b1_results.py`'s own precedent -- the JSON payloads carry
 no system/workload/config metadata of their own.
 
@@ -20,7 +25,8 @@ Usage:
     python3 scripts/aggregate_b1_vs_b2_results.py
 
 Regenerates:
-    docs/baseline/b1_vs_b2_comparison.csv / .md
+    docs/baseline/b1_vs_b2_comparison.csv / .md (10 reps)
+    docs/baseline/b1_vs_b2_comparison_30rep.csv / .md (30 reps)
 """
 from __future__ import annotations
 
@@ -33,16 +39,27 @@ from agentic_sim.observability.b1_pilot import _relative_contrast
 
 _BASELINE_DIR = Path(__file__).resolve().parent.parent / "docs" / "baseline"
 
-_MANIFEST: list[dict[str, str]] = [
-    {"system": "lumi", "workload": "storm",
-     "b1_file": "b1_vs_b2_lumi_b1_storm_result.json", "b2_file": "b1_vs_b2_lumi_b2_storm_result.json"},
-    {"system": "lumi", "workload": "supply_chain",
-     "b1_file": "b1_vs_b2_lumi_b1_supply_chain_result.json", "b2_file": "b1_vs_b2_lumi_b2_supply_chain_result.json"},
-    {"system": "roihu", "workload": "storm",
-     "b1_file": "b1_vs_b2_roihu_b1_storm_result.json", "b2_file": "b1_vs_b2_roihu_b2_storm_result.json"},
-    {"system": "roihu", "workload": "supply_chain",
-     "b1_file": "b1_vs_b2_roihu_b1_supply_chain_result.json", "b2_file": "b1_vs_b2_roihu_b2_supply_chain_result.json"},
-]
+
+def _manifest_10rep() -> list[dict[str, str]]:
+    return [
+        {"system": "lumi", "workload": "storm",
+         "b1_file": "b1_vs_b2_lumi_b1_storm_result.json", "b2_file": "b1_vs_b2_lumi_b2_storm_result.json"},
+        {"system": "lumi", "workload": "supply_chain",
+         "b1_file": "b1_vs_b2_lumi_b1_supply_chain_result.json", "b2_file": "b1_vs_b2_lumi_b2_supply_chain_result.json"},
+        {"system": "roihu", "workload": "storm",
+         "b1_file": "b1_vs_b2_roihu_b1_storm_result.json", "b2_file": "b1_vs_b2_roihu_b2_storm_result.json"},
+        {"system": "roihu", "workload": "supply_chain",
+         "b1_file": "b1_vs_b2_roihu_b1_supply_chain_result.json", "b2_file": "b1_vs_b2_roihu_b2_supply_chain_result.json"},
+    ]
+
+
+def _manifest_30rep() -> list[dict[str, str]]:
+    return [
+        {"system": item["system"], "workload": item["workload"],
+         "b1_file": item["b1_file"].replace("_result.json", "_30rep_result.json"),
+         "b2_file": item["b2_file"].replace("_result.json", "_30rep_result.json")}
+        for item in _manifest_10rep()
+    ]
 
 
 def _load_causal_only(filename: str) -> dict[str, Any]:
@@ -76,9 +93,9 @@ def _round(value: Any) -> Any:
     return round(value, 4) if isinstance(value, float) else value
 
 
-def main() -> int:
+def _build_rows(manifest: list[dict[str, str]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for item in _MANIFEST:
+    for item in manifest:
         b1_report = _load_causal_only(item["b1_file"])
         b2_report = _load_causal_only(item["b2_file"])
         synthetic = {"b1": b1_report, "b2": b2_report}
@@ -99,11 +116,21 @@ def main() -> int:
                 "bands_overlap": contrast.get("bands_overlap"),
             }
         )
+    return rows
 
-    _write_csv(_BASELINE_DIR / "b1_vs_b2_comparison.csv", rows)
-    _write_markdown_table(_BASELINE_DIR / "b1_vs_b2_comparison.md", rows, "B1 vs. B2 Comparison (causal_only, 10 reps)")
 
-    print(f"wrote {len(rows)} rows")
+def main() -> int:
+    rows_10rep = _build_rows(_manifest_10rep())
+    _write_csv(_BASELINE_DIR / "b1_vs_b2_comparison.csv", rows_10rep)
+    _write_markdown_table(_BASELINE_DIR / "b1_vs_b2_comparison.md", rows_10rep, "B1 vs. B2 Comparison (causal_only, 10 reps)")
+
+    rows_30rep = _build_rows(_manifest_30rep())
+    _write_csv(_BASELINE_DIR / "b1_vs_b2_comparison_30rep.csv", rows_30rep)
+    _write_markdown_table(
+        _BASELINE_DIR / "b1_vs_b2_comparison_30rep.md", rows_30rep, "B1 vs. B2 Comparison (causal_only, 30 reps)"
+    )
+
+    print(f"wrote {len(rows_10rep)} 10-rep rows, {len(rows_30rep)} 30-rep rows")
     return 0
 
 
