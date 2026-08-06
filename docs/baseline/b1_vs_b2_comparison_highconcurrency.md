@@ -1,0 +1,8 @@
+# B1 vs. B2 Comparison (causal_only, 5 reps, real concurrent load: ~58-78 requests/tick)
+
+| system | workload | b1_mean | b1_stdev | b1_count | b2_mean | b2_stdev | b2_count | relative_improvement | bands_overlap |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| lumi | storm | 4.538 | 0.3891 | 5 | 3.8954 | 0.2907 | 5 | -0.1416 | True |
+| lumi | supply_chain | 4.0542 | 0.2035 | 5 | 3.1864 | 0.1937 | 5 | -0.2141 | False |
+| roihu | storm | 17.9541 | 2.3473 | 5 | 14.8478 | 0.8816 | 5 | -0.173 | True |
+| roihu | supply_chain | 15.5483 | 0.5745 | 5 | 13.2083 | 1.1691 | 5 | -0.1505 | False |
