@@ -26,6 +26,11 @@ Three variants are aggregated:
   slower than B1 under genuine load (higher per-request latency from more
   queueing against its smaller cap), non-overlapping on 2 of 4 (system,
   workload) pairs at only 5 reps (exploratory scale).
+- "highconcurrency storm 15rep": a confirmatory follow-up on the 2 (system,
+  workload) pairs that were borderline (overlapping bands) at 5 reps --
+  lumi/storm and roihu/storm. Rerun at 15 reps, storm only, both systems:
+  both resolve to real, non-overlapping effects (lumi -18.2%, roihu -22.0%),
+  confirming the highconcurrency finding was not a 5-rep noise artifact.
 
 Reuses `agentic_sim.observability.b1_pilot._relative_contrast` unmodified --
 the exact same relative-improvement/bands-overlap math already used for
@@ -44,6 +49,7 @@ Regenerates:
     docs/baseline/b1_vs_b2_comparison.csv / .md (10 reps)
     docs/baseline/b1_vs_b2_comparison_30rep.csv / .md (30 reps)
     docs/baseline/b1_vs_b2_comparison_highconcurrency.csv / .md (5 reps, real concurrent load)
+    docs/baseline/b1_vs_b2_comparison_highconcurrency_storm_15rep.csv / .md (storm only, 15 reps)
 """
 from __future__ import annotations
 
@@ -85,6 +91,15 @@ def _manifest_highconcurrency() -> list[dict[str, str]]:
          "b1_file": f"b1_vs_b2_highconcurrency_{item['system']}_b1_{item['workload']}_result.json",
          "b2_file": f"b1_vs_b2_highconcurrency_{item['system']}_b2_{item['workload']}_result.json"}
         for item in _manifest_10rep()
+    ]
+
+
+def _manifest_highconcurrency_storm_15rep() -> list[dict[str, str]]:
+    return [
+        {"system": system, "workload": "storm",
+         "b1_file": f"b1_vs_b2_highconcurrency_{system}_b1_storm_15rep_result.json",
+         "b2_file": f"b1_vs_b2_highconcurrency_{system}_b2_storm_15rep_result.json"}
+        for system in ("lumi", "roihu")
     ]
 
 
@@ -163,9 +178,17 @@ def main() -> int:
         "B1 vs. B2 Comparison (causal_only, 5 reps, real concurrent load: ~58-78 requests/tick)",
     )
 
+    rows_storm_15rep = _build_rows(_manifest_highconcurrency_storm_15rep())
+    _write_csv(_BASELINE_DIR / "b1_vs_b2_comparison_highconcurrency_storm_15rep.csv", rows_storm_15rep)
+    _write_markdown_table(
+        _BASELINE_DIR / "b1_vs_b2_comparison_highconcurrency_storm_15rep.md", rows_storm_15rep,
+        "B1 vs. B2 Comparison (causal_only, storm only, 15 reps, real concurrent load -- "
+        "confirmatory follow-up on the 5-rep borderline (overlapping-bands) storm cases)",
+    )
+
     print(
         f"wrote {len(rows_10rep)} 10-rep rows, {len(rows_30rep)} 30-rep rows, "
-        f"{len(rows_highconcurrency)} highconcurrency rows"
+        f"{len(rows_highconcurrency)} highconcurrency rows, {len(rows_storm_15rep)} storm-15rep rows"
     )
     return 0
 
