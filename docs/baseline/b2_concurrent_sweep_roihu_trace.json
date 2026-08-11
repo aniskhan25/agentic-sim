@@ -1,0 +1,49 @@
+[
+  {
+    "dimension": "max_num_batched_tokens",
+    "candidates": [
+      {"value": 8192, "useful_agent_steps_per_second": {"count": 3, "mean": 14.572593, "stdev": 1.315241}, "had_preemption": false},
+      {"value": 16384, "useful_agent_steps_per_second": {"count": 3, "mean": 13.939675, "stdev": 1.251633}, "had_preemption": false},
+      {"value": 32768, "useful_agent_steps_per_second": {"count": 3, "mean": 14.788634, "stdev": 0.468821}, "had_preemption": false},
+      {"value": 65536, "useful_agent_steps_per_second": {"count": 3, "mean": 15.750593, "stdev": 1.349895}, "had_preemption": false}
+    ],
+    "selection": {
+      "winner": 8192,
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [8192, 16384, 32768, 65536],
+      "tied": [8192, 16384, 32768, 65536]
+    }
+  },
+  {
+    "dimension": "max_num_seqs",
+    "candidates": [
+      {"value": 32, "useful_agent_steps_per_second": {"count": 3, "mean": 14.239185, "stdev": 0.75394}, "had_preemption": false},
+      {"value": 64, "useful_agent_steps_per_second": {"count": 3, "mean": 20.13354, "stdev": 0.315462}, "had_preemption": false},
+      {"value": 128, "useful_agent_steps_per_second": {"count": 3, "mean": 21.397539, "stdev": 1.176089}, "had_preemption": false},
+      {"value": 256, "useful_agent_steps_per_second": {"count": 3, "mean": 21.778899, "stdev": 1.144802}, "had_preemption": false}
+    ],
+    "selection": {
+      "winner": 128,
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [32, 64, 128, 256],
+      "tied": [128, 256]
+    }
+  },
+  {
+    "dimension": "gpu_memory_utilization",
+    "candidates": [
+      {"value": 0.85, "useful_agent_steps_per_second": {"count": 3, "mean": 14.629029, "stdev": 0.338727}, "had_preemption": false},
+      {"value": 0.9, "useful_agent_steps_per_second": {"count": 3, "mean": 14.415466, "stdev": 1.179555}, "had_preemption": false},
+      {"value": 0.95, "useful_agent_steps_per_second": {"count": 3, "mean": 14.158719, "stdev": 0.493644}, "had_preemption": false}
+    ],
+    "selection": {
+      "winner": 0.85,
+      "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+      "disqualified": [],
+      "eligible": [0.85, 0.9, 0.95],
+      "tied": [0.85, 0.9, 0.95]
+    }
+  }
+]
