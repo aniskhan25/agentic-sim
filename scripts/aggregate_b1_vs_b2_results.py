@@ -41,6 +41,12 @@ Three variants are aggregated:
   parity with B1 (both bands overlap, +6.7% storm / +5.0% supply_chain --
   no longer a real loss); roihu now *beats* B1, non-overlapping on both
   workloads (+15.1% storm / +19.1% supply_chain).
+- "corrected lumi confirm": both B1 and B2 rerun on LUMI only at tripled
+  reps (storm 15->30, supply_chain 5->15) to test whether LUMI's
+  overlapping-band positive point estimates above were real. Result:
+  the edge shrinks further with more data (storm: +6.7% -> +1.6%;
+  supply_chain: +5.0% -> +0.6%), both still overlapping -- genuine
+  convergence toward parity, not a real effect obscured by noise.
 
 Reuses `agentic_sim.observability.b1_pilot._relative_contrast` unmodified --
 the exact same relative-improvement/bands-overlap math already used for
@@ -61,6 +67,7 @@ Regenerates:
     docs/baseline/b1_vs_b2_comparison_highconcurrency.csv / .md (5 reps, real concurrent load)
     docs/baseline/b1_vs_b2_comparison_highconcurrency_storm_15rep.csv / .md (storm only, 15 reps)
     docs/baseline/b1_vs_b2_comparison_corrected.csv / .md (B2 with corrected config, B1 reused)
+    docs/baseline/b1_vs_b2_comparison_corrected_lumi_confirm.csv / .md (LUMI only, tripled reps)
 """
 from __future__ import annotations
 
@@ -125,6 +132,17 @@ def _manifest_corrected() -> list[dict[str, str]]:
          "b1_file": f"b1_vs_b2_highconcurrency_{system}_b1_supply_chain_result.json",
          "b2_file": f"b1_vs_b2_highconcurrency_{system}_b2_supply_chain_corrected_result.json"}
         for system in ("lumi", "roihu")
+    ]
+
+
+def _manifest_corrected_lumi_confirm() -> list[dict[str, str]]:
+    return [
+        {"system": "lumi", "workload": "storm",
+         "b1_file": "b1_vs_b2_highconcurrency_lumi_b1_storm_30rep_result.json",
+         "b2_file": "b1_vs_b2_highconcurrency_lumi_b2_storm_30rep_corrected_result.json"},
+        {"system": "lumi", "workload": "supply_chain",
+         "b1_file": "b1_vs_b2_highconcurrency_lumi_b1_supply_chain_15rep_result.json",
+         "b2_file": "b1_vs_b2_highconcurrency_lumi_b2_supply_chain_15rep_corrected_result.json"},
     ]
 
 
@@ -219,10 +237,18 @@ def main() -> int:
         "gpu_memory_utilization 0.85 -- storm 15 reps, supply_chain 5 reps, B1 unchanged/reused)",
     )
 
+    rows_corrected_lumi_confirm = _build_rows(_manifest_corrected_lumi_confirm())
+    _write_csv(_BASELINE_DIR / "b1_vs_b2_comparison_corrected_lumi_confirm.csv", rows_corrected_lumi_confirm)
+    _write_markdown_table(
+        _BASELINE_DIR / "b1_vs_b2_comparison_corrected_lumi_confirm.md", rows_corrected_lumi_confirm,
+        "B1 vs. B2 Comparison (causal_only, corrected B2 config, LUMI only, tripled reps: "
+        "storm 30, supply_chain 15 -- confirming whether LUMI's overlapping-band edge is real)",
+    )
+
     print(
         f"wrote {len(rows_10rep)} 10-rep rows, {len(rows_30rep)} 30-rep rows, "
         f"{len(rows_highconcurrency)} highconcurrency rows, {len(rows_storm_15rep)} storm-15rep rows, "
-        f"{len(rows_corrected)} corrected rows"
+        f"{len(rows_corrected)} corrected rows, {len(rows_corrected_lumi_confirm)} corrected-lumi-confirm rows"
     )
     return 0
 
