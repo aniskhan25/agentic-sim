@@ -109,11 +109,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Overrides causal_only's ThreadPoolExecutor max_workers (CausalOnlyDispatchPolicy's own "
-            "default is 8, hardcoded here otherwise) -- the real, binding client-side concurrency "
-            "ceiling for causal_only (--self-hosted-max-concurrency only gates run_batch's internal "
-            "pool, which causal_only's submit()/poll() path never reaches with more than one request "
-            "at a time). Only affects causal_only; default (unset) leaves every policy unchanged."
+            "Overrides max_workers on naive_concurrent/barrier/causal_only/capability_aware "
+            "(each defaults to 8, hardcoded otherwise) -- the real, binding client-side concurrency "
+            "ceiling for these rungs (--self-hosted-max-concurrency only gates run_batch's internal "
+            "pool, which their submit()/poll() path never reaches with more than one request at a "
+            "time). Only affects those four rungs; queue_aware/full use --dispatch-max-in-flight "
+            "instead; default (unset) leaves every policy unchanged."
+        ),
+    )
+    parser.add_argument(
+        "--dispatch-max-in-flight",
+        type=int,
+        default=None,
+        help=(
+            "Overrides default_max_in_flight on queue_aware/full (QueueAwareDispatchPolicy's own "
+            "default is 4, hardcoded otherwise, tuned via docs/baseline/b1_retune_sweep_* -- itself "
+            "measured at agent_replicas=1, so may not hold under real concurrent load). Only affects "
+            "those two rungs; default (unset) leaves every policy unchanged."
         ),
     )
     parser.add_argument(
@@ -166,8 +178,21 @@ def main(argv: list[str] | None = None) -> int:
     else:
         dispatch_policies = dict(_ALL_DISPATCH_POLICIES)
 
-    if args.dispatch_max_workers is not None and "causal_only" in dispatch_policies:
-        dispatch_policies["causal_only"] = CausalOnlyDispatchPolicy(max_workers=args.dispatch_max_workers)
+    if args.dispatch_max_workers is not None:
+        if "naive_concurrent" in dispatch_policies:
+            dispatch_policies["naive_concurrent"] = NaiveConcurrentDispatchPolicy(max_workers=args.dispatch_max_workers)
+        if "barrier" in dispatch_policies:
+            dispatch_policies["barrier"] = BarrierDispatchPolicy(max_workers=args.dispatch_max_workers)
+        if "causal_only" in dispatch_policies:
+            dispatch_policies["causal_only"] = CausalOnlyDispatchPolicy(max_workers=args.dispatch_max_workers)
+        if "capability_aware" in dispatch_policies:
+            dispatch_policies["capability_aware"] = CapabilityAwareDispatchPolicy(max_workers=args.dispatch_max_workers)
+
+    if args.dispatch_max_in_flight is not None:
+        if "queue_aware" in dispatch_policies:
+            dispatch_policies["queue_aware"] = QueueAwareDispatchPolicy(default_max_in_flight=args.dispatch_max_in_flight)
+        if "full" in dispatch_policies:
+            dispatch_policies["full"] = FullDispatchPolicy(default_max_in_flight=args.dispatch_max_in_flight)
 
     result = run_b1_pilot(
         engine_factory=engine_factory,
