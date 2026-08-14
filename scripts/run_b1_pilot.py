@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 
+from agentic_sim.execution.batcher import BatchBuilder
 from agentic_sim.observability.b1_pilot import run_b1_pilot
 from agentic_sim.scenarios.storm import create_storm_engine
 from agentic_sim.scenarios.supply_chain import create_supply_chain_engine
@@ -129,6 +130,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--dispatch-max-batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Overrides max_batch_size on the BatchBuilder used by barrier/capability_aware/"
+            "queue_aware/full (BatchBuilder's own default is 8, hardcoded otherwise). This is a "
+            "third, independent concurrency ceiling distinct from --dispatch-max-workers/"
+            "--dispatch-max-in-flight: even with those raised, these four rungs still split each "
+            "backend_hint group into sequential chunks of at most max_batch_size, one blocking "
+            "dispatch round per chunk -- a real, previously-unaddressed confound under real load. "
+            "Only affects those four rungs; default (unset) leaves every policy unchanged."
+        ),
+    )
+    parser.add_argument(
         "--policies",
         help=(
             "Comma-separated subset of the 7-rung ladder to run (default: all 7). "
@@ -178,21 +193,33 @@ def main(argv: list[str] | None = None) -> int:
     else:
         dispatch_policies = dict(_ALL_DISPATCH_POLICIES)
 
+    batch_builder = (
+        BatchBuilder(max_batch_size=args.dispatch_max_batch_size) if args.dispatch_max_batch_size is not None else None
+    )
+    max_workers = args.dispatch_max_workers if args.dispatch_max_workers is not None else 8
+    max_in_flight = args.dispatch_max_in_flight if args.dispatch_max_in_flight is not None else 4
+
     if args.dispatch_max_workers is not None:
         if "naive_concurrent" in dispatch_policies:
-            dispatch_policies["naive_concurrent"] = NaiveConcurrentDispatchPolicy(max_workers=args.dispatch_max_workers)
-        if "barrier" in dispatch_policies:
-            dispatch_policies["barrier"] = BarrierDispatchPolicy(max_workers=args.dispatch_max_workers)
+            dispatch_policies["naive_concurrent"] = NaiveConcurrentDispatchPolicy(max_workers=max_workers)
         if "causal_only" in dispatch_policies:
-            dispatch_policies["causal_only"] = CausalOnlyDispatchPolicy(max_workers=args.dispatch_max_workers)
-        if "capability_aware" in dispatch_policies:
-            dispatch_policies["capability_aware"] = CapabilityAwareDispatchPolicy(max_workers=args.dispatch_max_workers)
+            dispatch_policies["causal_only"] = CausalOnlyDispatchPolicy(max_workers=max_workers)
 
-    if args.dispatch_max_in_flight is not None:
+    if args.dispatch_max_workers is not None or batch_builder is not None:
+        if "barrier" in dispatch_policies:
+            dispatch_policies["barrier"] = BarrierDispatchPolicy(batch_builder=batch_builder, max_workers=max_workers)
+        if "capability_aware" in dispatch_policies:
+            dispatch_policies["capability_aware"] = CapabilityAwareDispatchPolicy(
+                batch_builder=batch_builder, max_workers=max_workers
+            )
+
+    if args.dispatch_max_in_flight is not None or batch_builder is not None:
         if "queue_aware" in dispatch_policies:
-            dispatch_policies["queue_aware"] = QueueAwareDispatchPolicy(default_max_in_flight=args.dispatch_max_in_flight)
+            dispatch_policies["queue_aware"] = QueueAwareDispatchPolicy(
+                batch_builder=batch_builder, default_max_in_flight=max_in_flight
+            )
         if "full" in dispatch_policies:
-            dispatch_policies["full"] = FullDispatchPolicy(default_max_in_flight=args.dispatch_max_in_flight)
+            dispatch_policies["full"] = FullDispatchPolicy(batch_builder=batch_builder, default_max_in_flight=max_in_flight)
 
     result = run_b1_pilot(
         engine_factory=engine_factory,
