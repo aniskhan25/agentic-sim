@@ -1,0 +1,15 @@
+{
+  "winner": 64,
+  "reason": "tie-break: overlapping bands with the best candidate, chose the simpler/smaller value",
+  "disqualified": [],
+  "eligible": [
+    4,
+    16,
+    64,
+    128
+  ],
+  "tied": [
+    64,
+    128
+  ]
+}

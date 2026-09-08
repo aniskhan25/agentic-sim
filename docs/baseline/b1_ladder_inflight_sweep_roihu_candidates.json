@@ -1,0 +1,34 @@
+[
+  {
+    "value": 4,
+    "useful_agent_steps_per_second": {
+      "mean": 2.781658,
+      "stdev": 0.16308
+    },
+    "had_preemption": false
+  },
+  {
+    "value": 16,
+    "useful_agent_steps_per_second": {
+      "mean": 6.449004,
+      "stdev": 0.168201
+    },
+    "had_preemption": false
+  },
+  {
+    "value": 64,
+    "useful_agent_steps_per_second": {
+      "mean": 8.388165,
+      "stdev": 0.650296
+    },
+    "had_preemption": false
+  },
+  {
+    "value": 128,
+    "useful_agent_steps_per_second": {
+      "mean": 7.636488,
+      "stdev": 0.592183
+    },
+    "had_preemption": false
+  }
+]
