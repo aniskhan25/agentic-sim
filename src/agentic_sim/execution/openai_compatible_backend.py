@@ -387,14 +387,20 @@ def _slim_payload(payload: dict[str, Any], max_list: int = 3) -> dict[str, Any]:
 
 
 def _first_choice_text(response: dict[str, Any]) -> str:
+    """Never raises: a response with no choices or no text content is a real,
+    occasional occurrence under real concurrent load (observed crashing a real
+    HPC pilot run outright), not a programming error. Returns "" in either
+    case, which _try_parse's existing JSONDecodeError handling already turns
+    into the same invalid-proposal/repair-retry path used for malformed JSON
+    -- no new fallback mechanism, reusing what's already there and tested."""
     try:
         choice = response["choices"][0]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("response did not include choices") from exc
+    except (KeyError, IndexError, TypeError):
+        return ""
     message = choice.get("message", {}) if isinstance(choice, dict) else {}
     content = message.get("content") or choice.get("text")
     if not isinstance(content, str) or not content.strip():
-        raise ValueError("response choice did not include text content")
+        return ""
     return content
 
 

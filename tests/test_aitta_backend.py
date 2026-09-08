@@ -149,6 +149,36 @@ class AittaBackendTests(unittest.TestCase):
         self.assertEqual(len(result.outgoing_messages), 1)
         self.assertEqual(result.outgoing_messages[0].message_type, MessageType.STATUS_REQUEST)
 
+    def test_backend_treats_missing_choices_as_invalid_instead_of_crashing(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": []}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertTrue(result.metadata["model_output_invalid"])
+
+    def test_backend_treats_empty_message_content_as_invalid_instead_of_crashing(self):
+        def transport(url, headers, payload, timeout):
+            return {"choices": [{"message": {"content": ""}}]}
+
+        backend = AittaExecutionBackend(
+            api_key="secret",
+            base_url="https://aitta.example/openai/v1/",
+            model_name="demo/model",
+            transport=transport,
+        )
+
+        result = backend.run_batch([_request()])[0]
+
+        self.assertTrue(result.metadata["model_output_invalid"])
+
     def test_retry_count_is_zero_when_first_attempt_succeeds(self):
         def transport(url, headers, payload, timeout):
             return {"choices": [{"message": {"content": "{}"}}]}
