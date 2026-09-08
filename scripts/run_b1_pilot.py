@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         BatchBuilder(max_batch_size=args.dispatch_max_batch_size) if args.dispatch_max_batch_size is not None else None
     )
     max_workers = args.dispatch_max_workers if args.dispatch_max_workers is not None else 8
-    max_in_flight = args.dispatch_max_in_flight if args.dispatch_max_in_flight is not None else 4
+    in_flight_kwargs = {} if args.dispatch_max_in_flight is None else {"default_max_in_flight": args.dispatch_max_in_flight}
 
     if args.dispatch_max_workers is not None:
         if "naive_concurrent" in dispatch_policies:
@@ -215,11 +215,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dispatch_max_in_flight is not None or batch_builder is not None:
         if "queue_aware" in dispatch_policies:
-            dispatch_policies["queue_aware"] = QueueAwareDispatchPolicy(
-                batch_builder=batch_builder, default_max_in_flight=max_in_flight
-            )
+            dispatch_policies["queue_aware"] = QueueAwareDispatchPolicy(batch_builder=batch_builder, **in_flight_kwargs)
         if "full" in dispatch_policies:
-            dispatch_policies["full"] = FullDispatchPolicy(batch_builder=batch_builder, default_max_in_flight=max_in_flight)
+            dispatch_policies["full"] = FullDispatchPolicy(batch_builder=batch_builder, **in_flight_kwargs)
 
     result = run_b1_pilot(
         engine_factory=engine_factory,

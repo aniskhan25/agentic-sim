@@ -217,20 +217,26 @@ class QueueAwareDispatchPolicy(CapabilityAwareDispatchPolicy):
     concurrent-request budget, something rungs 1-5 do not do (they always
     dispatch an entire ready group concurrently, uncapped).
 
-    default_max_in_flight=4 is an evidence-based default, not an arbitrary
-    illustrative one: a real 7-rung pilot against live self-hosted vLLM
-    servers on both LUMI and Roihu (docs/research_roadmap.md item 19) found
-    the original default of 2 caused a statistically real throughput
-    regression relative to capability_aware (rung 5) on both systems. A
-    follow-up sweep over {2, 4, 8} (docs/baseline/b1_retune_sweep_{lumi,roihu}
-    _result.json) found 4 is the smallest value whose useful-agent-steps/sec
-    mean+-1-stdev band overlaps capability_aware's on both systems (2 does
-    not; 4 and 8 both do) -- per docs/hpc_data_collection_procedures.md's
-    tie-breaking rule, the smaller of two statistically-indistinguishable
-    options wins. Note this only retunes queue_aware itself: FullDispatchPolicy
-    (which inherits this default) did NOT improve with a larger cap in the
-    same sweep -- its bottleneck is its own sequential role-group-by-role-group
-    dispatch, a separate mechanism this value does not address.
+    default_max_in_flight=64 is an evidence-based default, corrected from an
+    earlier value of 4 that was itself tuned under a since-proven-unreliable
+    regime. The original 2->4 retune (see below) was measured entirely at
+    agent_replicas=1 -- the exact low-concurrency condition the B1-vs-B2
+    investigation (docs/research_roadmap.md item 19) later proved hides or
+    inverts real effects. Re-swept under real concurrent load
+    (--agent-replicas 12, both systems, docs/baseline/b1_ladder_inflight_sweep_
+    {lumi,roihu}_candidates.json): 4 is a real, non-overlapping loser on both
+    systems (LUMI 0.621 vs. 64's 1.938; Roihu 2.782 vs. 64's 8.388) -- a
+    direct structural parallel to B2's max_num_seqs=32 bug. 64 and 128 tie on
+    both systems; 64 wins the tie-break as the smaller value, and matches
+    causal_only's own throughput closely on both systems (no longer a
+    regression). Historical note, for context: the original default of 2
+    caused a statistically real throughput regression relative to
+    capability_aware (rung 5) at low concurrency; a follow-up sweep over
+    {2, 4, 8} (docs/baseline/b1_retune_sweep_{lumi,roihu}_result.json) picked
+    4 as the smallest value whose band overlapped capability_aware's then --
+    correct for that regime, wrong for real load. FullDispatchPolicy (which
+    inherits this default) shares the same correction and the same real-load
+    re-sweep evidence.
     """
 
     name = "queue_aware"
@@ -238,7 +244,7 @@ class QueueAwareDispatchPolicy(CapabilityAwareDispatchPolicy):
     def __init__(
         self,
         batch_builder: BatchBuilder | None = None,
-        default_max_in_flight: int = 4,
+        default_max_in_flight: int = 64,
         max_in_flight: dict[str, int] | None = None,
     ):
         self.batch_builder = batch_builder or BatchBuilder()
