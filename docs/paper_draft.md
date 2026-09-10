@@ -1,14 +1,14 @@
 # An Infrastructure-Agnostic Runtime for Reproducible and Reliable LLM-Agent Simulations
 
-**Status**: first draft, structural skeleton with substantive content. Not camera-ready. Numbers below are drawn directly from committed artifacts in `docs/baseline/`; every claim should be spot-checked against its cited file before submission. Sections marked `[TODO]` need material that does not exist yet (see §7, Limitations).
+**Status**: first draft, structural skeleton with substantive content. Not camera-ready. Numbers below are drawn directly from committed artifacts in `docs/baseline/`; every claim should be spot-checked against its cited file before submission. Sections marked `[TODO]` need material that does not exist yet (see §6, Limitations).
 
-This draft follows the **fallback headline** from `docs/research_roadmap.md`'s preregistered contribution decision gate (item 14): the scheduler-led primary claim did not clear its own preregistered bar, so the paper is centered on the contract/provenance/reliability model and portability, with scheduling reported as a rigorously evaluated systems mechanism rather than claimed as a win. This is not a downgrade — it is the decision the roadmap itself committed to making *before* seeing results, and the honesty of that process is part of the paper's actual contribution (§5.3, §6).
+This draft follows the **fallback headline** from `docs/research_roadmap.md`'s preregistered contribution decision gate (item 14): the scheduler-led primary claim did not clear its own preregistered bar, so the paper is centered on the contract/provenance/reliability model and portability, with scheduling reported as a rigorously evaluated systems mechanism rather than claimed as a win. This is not a downgrade — it is the decision the roadmap itself committed to making *before* seeing results, and the honesty of that process is part of the paper's actual contribution (§4.3, §6).
 
 ---
 
 ## Abstract
 
-`[TODO — write last, after §5 numbers are finalized]`
+`[TODO — write last, after §4 numbers are finalized]`
 
 Draft pointers: (1) a provider-neutral runtime that makes model proposals, repair, policy completion, fallback, contract violations, and retained model autonomy explicitly measurable and comparable across heterogeneous LLM-agent simulation infrastructure; (2) validated on two real, independently operated HPC systems with different accelerator vendors (AMD MI250X / LUMI, NVIDIA GH200 / Roihu) running an identical model revision; (3) a capability-aware causal scheduler was built and evaluated against a preregistered decision gate — under real concurrent load, with three independent measurement confounds identified and corrected, it shows no measurable difference from a causal-only baseline on the one workload currently testable on real hardware, a result explained by the workload's lack of genuine multi-provider heterogeneity rather than a mechanism failure; (4) the same investigation reversed an initial "platform-tuned config is slower" finding into "ties on one system, real win on the other" once an analogous serving-configuration confound was found and fixed.
 
@@ -29,10 +29,10 @@ LLM-agent simulations increasingly run against real inference infrastructure —
 
 ### 1.3 Contribution hierarchy (as evaluated, not as hoped)
 
-1. **Primary**: a provider-neutral activation, contract, and provenance model that makes model-generated vs. repaired vs. policy-completed vs. fallback behavior, and their effect on reliability and autonomy, explicit and measurable — validated on two real, heterogeneous HPC systems (§5.1).
-2. **Enabling mechanisms**: the causal activation graph and verifier, the atomic idempotent commit protocol, and the provider-neutral execution/dispatch interfaces (§3).
-3. **Evidence**: controlled, within-system workload measurements on both real systems, reported with explicit statistical criteria, including two full negative-result-then-correction investigations reported honestly rather than smoothed over (§5.2, §5.3).
-4. **Evaluated, not claimed**: a capability-aware causal scheduler, tested against a decision gate preregistered before any real-load result existed. The gate is not cleared — full-ladder throughput is statistically tied to a causal-only baseline on both systems once three measurement confounds are corrected. We report why this is a workload-coverage limitation, not a negative finding about the mechanism (§5.3, §6).
+1. **Primary**: a provider-neutral activation, contract, and provenance model that makes model-generated vs. repaired vs. policy-completed vs. fallback behavior, and their effect on reliability and autonomy, explicit and measurable — validated on two real, heterogeneous HPC systems (§4.1).
+2. **Enabling mechanisms**: the causal activation graph and verifier, the atomic idempotent commit protocol, and the provider-neutral execution/dispatch interfaces, given a formal treatment in §2.1 (§2).
+3. **Evidence**: controlled, within-system workload measurements on both real systems, reported with explicit statistical criteria, including two full negative-result-then-correction investigations reported honestly rather than smoothed over (§4.2, §4.3).
+4. **Evaluated, not claimed**: a capability-aware causal scheduler, tested against a decision gate preregistered before any real-load result existed. The gate is not cleared — full-ladder throughput is statistically tied to a causal-only baseline on both systems once three measurement confounds are corrected. We report why this is a workload-coverage limitation, not a negative finding about the mechanism (§4.3, §6).
 
 ### 1.4 What this paper does not claim
 
@@ -42,29 +42,60 @@ Following `docs/research_roadmap.md`'s own positioning discipline: we do not cla
 
 ## 2. System Design
 
-### 2.1 Observational semantics and activation identity
+### 2.1 Formal model
 
-The runtime commits to an explicit observational-equivalence model (ADR 0001): a fixed activation representation (`Activation`, with `attempt_number` distinguishing retries), a fixed causal-parent chain over messages (`Message.origin_activation_id`, `Event.causal_parent_activation_id`), and monotonically versioned agent/environment state (`AgentState.version`, `EnvironmentState.version`). Two runs of the same specification are compared by their committed observation projection, not by wall-clock replay.
+We fix notation used throughout the rest of the paper. It describes precisely what the implementation (§2.2–§2.7) actually computes; propositions below are labeled either *immediate* (true by construction of the algorithm) or *empirically verified* (checked by the test suites cited, not proved).
 
-### 2.2 Provider-neutral execution interface
+**Events, activations, and agent state.** Let $\mathcal{Ag}$ be the set of agents. Agent $a \in \mathcal{Ag}$ has state $s_a^{(v)} \in \Sigma_a$ at version $v \in \mathbb{N}$, incremented monotonically on every applied mutation. An **event** $e \in \mathcal{E}$ (an environment tick, a delivered message, or an emitted side effect) triggers zero or more **activations**. An activation is a tuple
+$$\alpha = \langle a,\ e,\ r,\ p,\ k \rangle \in \mathcal{Ag} \times \mathcal{E} \times \mathrm{Reason} \times \mathbb{N} \times \mathbb{N},$$
+identified by a unique `activation_id`, with attempt number $k$ distinguishing a retry of the same logical activation from a new one. Executing $\alpha$ against the backend yields an **execution result**: a proposed state transition $s_a^{(v)} \to s_a^{(v+1)}$, a set of outgoing messages $M(\alpha) \subseteq \mathcal{M}$, and a set of emitted events $\mathrm{Ev}(\alpha) \subseteq \mathcal{E}$.
+
+**Causal order.** Define $\prec$ ("happens-before") as the smallest transitive relation on activations such that $\alpha \prec \alpha'$ whenever either (i) some $m \in M(\alpha)$ triggers $\alpha'$ (a message-mediated dependency, tracked as `Message.origin_activation_id`), or (ii) some $e' \in \mathrm{Ev}(\alpha)$ triggers $\alpha'$ (an event-mediated dependency, tracked as `Event.causal_parent_activation_id`). Two activations are **causally independent**, written $\alpha_1 \parallel \alpha_2$, iff neither $\alpha_1 \prec \alpha_2$ nor $\alpha_2 \prec \alpha_1$.
+
+**Causal readiness and wave decomposition.** At tick $t$, an activation is *causally ready* iff its triggering event has occurred and every $\alpha'$ with $\alpha' \prec \alpha$ has already committed. Let $R_t$ be the set of activations ready for dispatch at $t$, and let $\prec_{R_t}$ be $\prec$ restricted to pairs both in $R_t$ (a same-tick dependency can only arise from a message or event produced *within* $R_t$ itself, since any cross-tick parent has already committed and imposes no further wait). A **wave decomposition** of $R_t$ is the topological layering of $(R_t, \prec_{R_t})$: $W_0 = \{\alpha \in R_t : \nexists\, \alpha' \in R_t,\ \alpha' \prec \alpha\}$, and $W_i = \{\alpha \in R_t \setminus \bigcup_{j<i} W_j : \forall\, \alpha' \prec \alpha,\ \alpha' \in \bigcup_{j<i} W_j\}$. By construction, $\forall\, \alpha_1, \alpha_2 \in W_i,\ \alpha_1 \parallel \alpha_2$ — a dispatch policy may run every activation in one wave concurrently without violating $\prec$, and must complete wave $W_i$ before starting $W_{i+1}$. This is exactly `build_causal_waves`'s Kahn's-algorithm-style layering, restricted to intra-batch parents.
+
+*Proposition 1 (wave-safety, immediate).* Any dispatch policy that dispatches concurrently only within a wave $W_i$, in wave order, preserves $\prec$ regardless of real execution latency variance — no ordering violation is possible because, by construction, no two members of $W_i$ are $\prec$-comparable.
+
+*Proposition 2 (single-wave collapse on today's workloads, empirically verified).* On every workload evaluated in this paper, a message sent during tick $t$ can only be read starting tick $t+1$ at the earliest, so no activation in $R_t$ ever depends on another activation in $R_t$: $\forall\, t,\ W_0 = R_t$ (one wave). Consequently `causal_only` and `naive_concurrent` are observationally equivalent (Def. below) on `storm`/`supply_chain` today — the two rungs are distinguished only on a workload with genuine intra-tick dependencies, which none evaluated here has (§6).
+
+**Observational equivalence.** Two executions $\pi_1, \pi_2$ of the same specification are observationally equivalent, $\pi_1 \sim \pi_2$, iff there is a bijection between their committed activations that preserves $\prec$, every agent-visible message's content, and every agent's final state version. $\sim$ is the notion ADR 0001 fixes as the target of comparison — not wall-clock replay, but agreement on the committed causal graph up to reordering of $\parallel$-related activations.
+
+*Proposition 3 (dispatch-policy equivalence under no write-conflict, empirically verified).* If no two causally independent activations write-conflict on shared environment state, then execution under `sequential` and execution under any wave-respecting concurrent policy are observationally equivalent: $\pi_{\text{sequential}} \sim \pi_{\text{concurrent}}$. Checked directly (not merely asserted) on every non-conflict synthetic kernel shape and on `storm`/`supply_chain`: all seven rungs produce identical `graph_metrics` and zero `causal_verifier` violations (`tests/test_dispatch_policies.py`, `observability/causal_verifier.py`).
+
+**Atomic commit.** A commit unit for activation $\alpha$ is $C(\alpha) = \langle \Delta s_a,\ M(\alpha),\ \mathrm{Ev}(\alpha),\ v_{\text{expected}} \rangle$. The commit transition $\mathrm{commit}: \Sigma \times C \to \Sigma \times \{\textsc{committed}, \textsc{duplicate}, \textsc{conflict}\}$ satisfies:
+- **idempotence**: if `activation_id` was already committed, $\mathrm{commit}(\sigma, C(\alpha)) = (\sigma, \textsc{duplicate})$ — re-application is a no-op, not a re-apply;
+- **optimistic version safety**: if $v_{\text{expected}} \ne$ agent $a$'s current version in $\sigma$, $\mathrm{commit}(\sigma, C(\alpha)) = (\sigma, \textsc{conflict})$ — $\sigma$ unchanged;
+- **all-or-nothing**: otherwise, $\Delta s_a$, $M(\alpha)$, and $\mathrm{Ev}(\alpha)$ are applied together or not at all.
+
+This scope is $\langle \Delta s_a, M(\alpha), \mathrm{Ev}(\alpha)\rangle$ only — shared environment-state mutation is *not* part of $C(\alpha)$ in the current implementation (§6).
+
+**Contracts.** A contract is a predicate over a proposed action, checked before commit: $\mathrm{bounded}_B(\delta) \equiv |\delta| \le B$; $\mathrm{cardinality}(\mathrm{acts}) \equiv$ no (agent, action-type, target) triple is applied more than once per activation; $\mathrm{must\_not}(\mathrm{act}, \Phi) \equiv \mathrm{act} \notin \Phi$ for a declared forbidden set $\Phi$. A step is *semantically valid* iff its parsed proposal is well-formed and every active contract holds.
+
+**Reliability metrics.** For a run with committed activations $A$, retained autonomy is $\rho = \frac{1}{|A|}\sum_{\alpha \in A} \mathbb{1}[\text{committed atoms of } \alpha \text{ are all genuinely model-proposed}]$ (§4.1's "model autonomy rate"); usefulness is $u(\alpha) = \mathbb{1}[\alpha\text{'s commit succeeded and its result was semantically valid}]$, and throughput is $\frac{\sum_{\alpha \in A} u(\alpha)}{T_{\text{wall}}}$ (`useful_agent_steps_per_second`, §3.3).
+
+### 2.2 Observational semantics and activation identity
+
+The runtime commits to the $\sim$-equivalence model above (ADR 0001) at the implementation level: a fixed activation representation (`Activation`, with `attempt_number` distinguishing retries, formalized as $k$ above), a fixed causal-parent chain over messages and events (`Message.origin_activation_id`, `Event.causal_parent_activation_id`, formalizing $\prec$), and monotonically versioned agent/environment state (`AgentState.version`, `EnvironmentState.version`, formalizing $v$). Two runs of the same specification are compared by $\sim$, not by wall-clock replay.
+
+### 2.3 Provider-neutral execution interface
 
 `ExecutionBackend` (a narrow Protocol: `run_batch`) is implemented identically by a deterministic mock backend, a rule-based backend, a synthetic-kernel backend, a managed-endpoint backend (Aitta), and a self-hosted OpenAI-compatible backend (`OpenAICompatibleExecutionBackend`, extracted from the Aitta backend's fully-generic request/response/repair/provenance logic — the two differ only in auth and prefix-caching/context-length defaults). All backends are exercised by one shared conformance test suite (`tests/test_async_provider_conformance.py`), not four independent, potentially-diverging implementations.
 
-### 2.3 Contracts and per-atom provenance
+### 2.4 Contracts and per-atom provenance
 
-Every proposed agent action passes through explicit contracts (`role_policy.py`): `must_not` (hard prohibitions), `bounded` (numeric deltas cannot be unbounded), `cardinality` (no silent duplicate application), and `allowed` (actions restricted to a declared set). Violations are counted per atom, not discarded. Every step produces an `ExecutionReceipt` carrying activation id, attempt number, provider/model identity, causal parents, state-version read and written, accelerator/serving-runtime identity, and `manifest_mode` (common-denominator vs. platform-tuned, §2.5) — but not yet a content hash of the request or response; those schema fields exist and are currently unpopulated (§7).
+Every proposed agent action passes through the contracts defined in §2.1 (`role_policy.py`): `must_not`, `bounded`, `cardinality`, and `allowed` (actions restricted to a declared set). Violations are counted per atom, not discarded. Every step produces an `ExecutionReceipt` carrying activation id, attempt number $k$, provider/model identity, causal parents, state-version read and written ($v \to v+1$), accelerator/serving-runtime identity, and `manifest_mode` (common-denominator vs. platform-tuned, §2.6) — but not yet a content hash of the request or response; those schema fields exist and are currently unpopulated (§6).
 
-### 2.4 Causal verification and atomic commit
+### 2.5 Causal verification and atomic commit
 
-`observability/causal_verifier.py` checks the message-mediated causal chain for duplicates, missing parents, cycles, and stale-read conflicts — verified to report zero violations on real storm/supply-chain runs, and independently verified to detect each violation class when deliberately constructed. `RuntimeStore.commit()` applies one activation's state mutation, outgoing messages, and emitted events as a single atomic, idempotent unit (duplicate `activation_id` is a no-op; a stale expected state version is rejected), implemented identically by an in-memory store and a SQLite store and checked by one shared conformance suite. Environment-state mutation (shared across agents within a tick) remains outside this atomic boundary, applied as a separate batched step — a scoped, documented limitation, not an oversight (§7).
+`observability/causal_verifier.py` checks the message-mediated $\prec$-chain for duplicates, missing parents, cycles, and stale-read conflicts — verified to report zero violations on real storm/supply-chain runs, and independently verified to detect each violation class when deliberately constructed. `RuntimeStore.commit()` implements the $\mathrm{commit}$ transition of §2.1 identically in an in-memory store and a SQLite store, checked by one shared conformance suite. Environment-state mutation remains outside $C(\alpha)$'s boundary, applied as a separate batched step — a scoped, documented limitation, not an oversight (§6).
 
-### 2.5 Common-denominator and platform-tuned modes
+### 2.6 Common-denominator and platform-tuned modes
 
 Every real evaluation run declares a `PlatformManifest.manifest_mode`: `common_denominator` (B1 — identical serving configuration on both systems, the feature-parity intersection of what both platforms actually support) or `platform_tuned` (B2 — independently selected per system via a frozen, preregistered selection procedure with a documented tie-break rule). This lets every reported effect be attributed to a labeled configuration choice, never silently conflated.
 
-### 2.6 The dispatch-policy ladder
+### 2.7 The dispatch-policy ladder
 
-Seven dispatch policies, each strictly extending the causal-readiness guarantee of the one before it: `sequential`, `naive_concurrent`, `barrier`, `causal_only` (causal readiness and state-conflict avoidance, no further optimization), `capability_aware` (dispatches a group concurrently only if the backend declares `supports_concurrency`), `queue_aware` (adds a bounded per-provider in-flight cap), `full` (adds role/prefix-adjacent reordering). All seven share one `DispatchPolicy` Protocol; `SimulationEngine` requires no changes to add a new rung.
+Seven dispatch policies, each strictly extending the wave-safety guarantee (Proposition 1) of the one before it with a further optimization: `sequential` ($|W_i|$ dispatched one at a time), `naive_concurrent` (all of $R_t$ concurrent, no wave decomposition), `barrier` (waves as batching boundaries only), `causal_only` (waves as defined in §2.1, no further optimization), `capability_aware` (dispatches a wave's group concurrently only if the backend declares `supports_concurrency`), `queue_aware` (adds a bounded per-provider in-flight cap $\kappa$), `full` (adds role/prefix-adjacent reordering within a group). All seven share one `DispatchPolicy` Protocol; `SimulationEngine` requires no changes to add a new rung.
 
 ---
 
@@ -76,7 +107,7 @@ Two real, independently administered HPC systems: **LUMI** (AMD MI250X, ROCm, ~2
 
 ### 3.2 Workloads
 
-`storm` (disaster-response coordination, 4 roles) and `supply_chain` (5 roles) are evaluated end-to-end against real self-hosted inference on both systems. Three further workload families specified by the evaluation plan — a deterministic minimum-DAG kernel, synthetic dependency-graph shapes, and deterministic failure injection — exist as real, tested code (`environment/synthetic_env.py`, `execution/failure_injecting_backend.py`, six parameterized kernel shapes with hand-derived invariants) but currently run only against a mock/rule backend; `create_synthetic_engine` explicitly rejects real backends today (§7).
+`storm` (disaster-response coordination, 4 roles) and `supply_chain` (5 roles) are evaluated end-to-end against real self-hosted inference on both systems. Three further workload families specified by the evaluation plan — a deterministic minimum-DAG kernel, synthetic dependency-graph shapes, and deterministic failure injection — exist as real, tested code (`environment/synthetic_env.py`, `execution/failure_injecting_backend.py`, six parameterized kernel shapes with hand-derived invariants) but currently run only against a mock/rule backend; `create_synthetic_engine` explicitly rejects real backends today (§6).
 
 ### 3.3 Metrics
 
@@ -113,7 +144,7 @@ Second, **raw model output is invalid, even after in-loop repair, roughly half t
 
 Third, **B1 and B2 (corrected) are nearly identical on every reliability metric within a system/workload pair** (e.g., LUMI storm invalid rate 64.8% vs. 65.2%; Roihu storm semantic-valid 51.1% vs. 52.6%). This is expected and serves as an internal check: the two configurations differ only in serving parameters (batching/concurrency limits, precision choices already fixed identically), never in model weights or scenario logic, so reliability behavior should — and does — stay stable across the throughput reversal reported in §4.2. Contract violations are rare on both systems (4 total across 46,701 combined steps: 3 `state_mutation` and 1 `must_not`, all on LUMI) and are reported exactly as observed rather than rounded to zero.
 
-The one cross-system pattern worth flagging cautiously, not over-interpreting: Roihu's invalid-output rate is consistently lower than LUMI's on `storm` (~48% vs. ~65%) despite an identical model revision, identical `fp8_e4m3` KV-cache precision, and near-identical decoding parameters. Per §1.4, we do not claim this isolates an AMD/ROCm-vs-NVIDIA/CUDA effect — the two systems also differ in vLLM release (`0.19.0` vs. `0.19.1`, the closest available pairing) and in the underlying attention-kernel implementation actually exercised, either of which could plausibly explain a generation-quality difference of this size. This is exactly the kind of software-maturity confound §Principal Risks anticipates, reported as an open observation rather than resolved into a hardware claim.
+The one cross-system pattern worth flagging cautiously, not over-interpreting: Roihu's invalid-output rate is consistently lower than LUMI's on `storm` (~48% vs. ~65%) despite an identical model revision, identical `fp8_e4m3` KV-cache precision, and near-identical decoding parameters. Per §1.4, we do not claim this isolates an AMD/ROCm-vs-NVIDIA/CUDA effect — the two systems also differ in vLLM release (`0.19.0` vs. `0.19.1`, the closest available pairing) and in the underlying attention-kernel implementation actually exercised, either of which could plausibly explain a generation-quality difference of this size. This is exactly the kind of software-maturity confound §6 anticipates, reported as an open observation rather than resolved into a hardware claim.
 
 ### 4.2 Platform-tuned vs. common-denominator configuration: a confound, found and corrected
 
@@ -154,7 +185,7 @@ With both confounds corrected, a final confirmatory rerun found **all six concur
 | Real load, batch-cap fixed | −66.1% (real) | −63.8% (real) |
 | Real load, both fixed | +1.1% (overlap) | −0.3% (overlap) |
 
-**Interpretation.** The decision gate is not cleared. This is not evidence that capability-aware/queue-aware/prefix-grouping scheduling is ineffective — it is evidence that the one workload currently testable on real hardware (`storm`) provides no genuine multi-provider heterogeneity: every real agent in every real run this study performed routes to the same single serving endpoint, so `capability_aware`'s per-provider capability gate and `queue_aware`'s per-provider backpressure budget have literally nothing to differentiate. The mechanism has never been tested under the condition it is designed for. §6 and §7 discuss what that test requires.
+**Interpretation.** The decision gate is not cleared. This is not evidence that capability-aware/queue-aware/prefix-grouping scheduling is ineffective — it is evidence that the one workload currently testable on real hardware (`storm`) provides no genuine multi-provider heterogeneity: every real agent in every real run this study performed routes to the same single serving endpoint, so `capability_aware`'s per-provider capability gate and `queue_aware`'s per-provider backpressure budget have literally nothing to differentiate. The mechanism has never been tested under the condition it is designed for. §6 discusses what that test requires.
 
 ### 4.4 Cross-system portability
 
