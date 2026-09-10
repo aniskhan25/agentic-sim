@@ -92,7 +92,28 @@ Every contrast in this paper uses the same rule throughout: mean useful-throughp
 
 ### 4.1 Reliability and provenance across heterogeneous infrastructure
 
-`[TODO — pull the per-origin behavior breakdown (model-generated / repaired / policy-completed / fallback), autonomy rate, and contract-violation counts across the real B1 and corrected-B2 runs on both systems into a table here. This is the paper's actual headline evidence and has not yet been assembled into one comparative table — the raw numbers exist scattered across docs/baseline/*.json backend_metrics blocks.]`
+We report the per-origin behavior breakdown, retained model autonomy, and contract-violation counts for the same eight real runs used in §4.2 (B1 and corrected-B2, both workloads, both systems, real concurrent load, most-solid available repetition count: LUMI storm at 30 reps, LUMI supply_chain at 15, Roihu storm at 15, Roihu supply_chain at 5). `invalid_model_outputs` reflects the proposal's validity *after* the pipeline's own repair-retry budget is exhausted, not the model's raw first-pass output — so it measures how often repair alone fails to recover a usable structured output, not raw generation quality.
+
+| System | Workload | Mode | Steps | Invalid after repair | Repair attempted | Semantic-valid | Guard-added msgs/step | Guard-added actions/step | Model autonomy rate | Violations (must-not / bounded / cardinality / state) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| LUMI | storm | B1 | 11,655 | 64.8% | 82.1% | 35.2% | 1.11 | 0.26 | 0.02% | 0 / 0 / 0 / 1 |
+| LUMI | storm | B2 (corrected) | 11,663 | 65.2% | 81.5% | 34.8% | 1.11 | 0.26 | 0.01% | 0 / 0 / 0 / 2 |
+| LUMI | supply_chain | B1 | 4,393 | 59.8% | 75.8% | 40.2% | 1.47 | 0.017 | 0.00% | 1 / 0 / 0 / 0 |
+| LUMI | supply_chain | B2 (corrected) | 4,395 | 59.9% | 74.0% | 40.1% | 1.47 | 0.017 | 0.00% | 0 / 0 / 0 / 0 |
+| Roihu | storm | B1 | 5,832 | 48.9% | 58.6% | 51.1% | 1.11 | 0.26 | 0.00% | 0 / 0 / 0 / 0 |
+| Roihu | storm | B2 (corrected) | 5,835 | 47.4% | 57.8% | 52.6% | 1.11 | 0.26 | 0.00% | 0 / 0 / 0 / 0 |
+| Roihu | supply_chain | B1 | 1,464 | 56.6% | 63.7% | 43.4% | 1.48 | 0.016 | 0.00% | 0 / 0 / 0 / 0 |
+| Roihu | supply_chain | B2 (corrected) | 1,464 | 58.5% | 64.3% | 41.5% | 1.48 | 0.016 | 0.00% | 0 / 0 / 0 / 0 |
+
+**Three findings, in order of importance.**
+
+First, and most consequential for RQ3: **retained model autonomy is effectively zero across every system, workload, and configuration** (0.00–0.02%, i.e. indistinguishable from zero at this precision). Despite a real 7-8B instruct model producing genuinely variable free-text completions, essentially none of the runtime's committed messages or actions in this dataset trace back to a raw, unmodified model proposal — the pipeline's policy-completion layer supplies the committed behavior in practically every step. Yet **useful-step coverage is 99.99%** (11,654 of 11,655 steps on the largest run) — the simulation keeps producing contract-satisfying, committed behavior throughout, but that reliability is achieved by the scaffolding around the model, not by the model. This is exactly the distinction RQ3 asks the runtime to make explicit and measurable, and exactly the risk §Principal Risks warns against papering over ("contracts conceal loss of model agency") — here it does not, because the metric is reported plainly rather than folded into an undifferentiated throughput number.
+
+Second, **raw model output is invalid, even after in-loop repair, roughly half the time** (47–65% across combinations), with repair attempted on 58–82% of steps. Repair attempts and final invalidity move together, not inversely — attempting repair more often does not correspond to a lower final-invalid rate across these rows, suggesting the repair loop's fixed retry budget recovers a minority of malformed completions rather than reliably rescuing them; policy completion, not repair, is what keeps `useful_step` coverage near 100%.
+
+Third, **B1 and B2 (corrected) are nearly identical on every reliability metric within a system/workload pair** (e.g., LUMI storm invalid rate 64.8% vs. 65.2%; Roihu storm semantic-valid 51.1% vs. 52.6%). This is expected and serves as an internal check: the two configurations differ only in serving parameters (batching/concurrency limits, precision choices already fixed identically), never in model weights or scenario logic, so reliability behavior should — and does — stay stable across the throughput reversal reported in §4.2. Contract violations are rare on both systems (4 total across 46,701 combined steps: 3 `state_mutation` and 1 `must_not`, all on LUMI) and are reported exactly as observed rather than rounded to zero.
+
+The one cross-system pattern worth flagging cautiously, not over-interpreting: Roihu's invalid-output rate is consistently lower than LUMI's on `storm` (~48% vs. ~65%) despite an identical model revision, identical `fp8_e4m3` KV-cache precision, and near-identical decoding parameters. Per §1.4, we do not claim this isolates an AMD/ROCm-vs-NVIDIA/CUDA effect — the two systems also differ in vLLM release (`0.19.0` vs. `0.19.1`, the closest available pairing) and in the underlying attention-kernel implementation actually exercised, either of which could plausibly explain a generation-quality difference of this size. This is exactly the kind of software-maturity confound §Principal Risks anticipates, reported as an open observation rather than resolved into a hardware claim.
 
 ### 4.2 Platform-tuned vs. common-denominator configuration: a confound, found and corrected
 
