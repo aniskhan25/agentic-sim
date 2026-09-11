@@ -1,0 +1,59 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------------------------------------------------------------------------
+% Packages
+% ---------------------------------------------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+\usepackage{natbib}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------------
+% Theorem-like environments
+% ---------------------------------------------------------------------------
+\newtheorem{proposition}{Proposition}
+
+% ---------------------------------------------------------------------------
+% Terminology macros (kept in one place; see workflow guidance on
+% controlling terminology globally)
+% ---------------------------------------------------------------------------
+\newcommand{\Sequential}{\textit{Sequential}}
+\newcommand{\NaiveConcurrent}{\textit{Naive-Concurrent}}
+\newcommand{\Barrier}{\textit{Barrier}}
+\newcommand{\CausalOnly}{\textit{Causal-Order-Only}}
+\newcommand{\CapabilityAware}{\textit{Capability-Aware}}
+\newcommand{\QueueAware}{\textit{Queue-Aware}}
+\newcommand{\Full}{\textit{Full}}
+\newcommand{\SysA}{System A (AMD)}
+\newcommand{\SysB}{System B (NVIDIA)}
+
+\title{An Infrastructure-Agnostic Runtime for Reproducible and Reliable LLM-Agent Simulations}
+\author{Anis Ur Rahman \\[2pt] \small CSC -- IT Center for Science, Espoo, Finland \\[-2pt] \small \texttt{anis.rahman@csc.fi}}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Large-scale agentic simulations built on large language models increasingly run against real inference infrastructure: self-hosted servers on HPC systems, managed API endpoints, and heterogeneous accelerator vendors, rather than a single fixed provider. Comparing scheduling or serving-configuration choices across such infrastructure is prone to a specific failure mode. Under-provisioned concurrency, uncorrected tie-break defaults, and undocumented client-side batching limits can each independently produce a confident, statistically non-overlapping result that reverses once the true bottleneck is identified. We present a provider-neutral runtime that makes model proposals, repair, policy completion, fallback behavior, contract violations, and retained model autonomy explicit and measurable across such infrastructure. The runtime is built around a formal activation model with an explicit happens-before order, wave-based concurrent scheduling, and an atomic idempotent commit protocol. We evaluate it on two real, independently administered HPC systems with different accelerator vendors (AMD and NVIDIA), running an identical instruction-tuned model revision on two multi-role agent-coordination workloads. Retained model autonomy is 0.00--0.02\% across every system, workload, and configuration, despite 99.99\% of steps remaining useful: reliability in this pipeline comes from policy completion, not from the model. We built a capability-aware causal scheduler and evaluated it against a decision gate preregistered before any real-load result existed. Under real concurrent load, with three independent measurement confounds identified and corrected, the scheduler is statistically tied with a causal-order-only baseline on both systems, a result we attribute to the absence of genuine multi-provider heterogeneity in the one workload class currently testable on real hardware, not to a mechanism failure. The same investigation reversed an initial finding that a platform-tuned serving configuration was 15--22\% slower into a tie on one system and a 15--19\% real improvement on the other, once an analogous serving-configuration confound was found and corrected.
+\end{abstract}
+
+\input{sections/introduction}
+\input{sections/system_design}
+\input{sections/methodology}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/limitations}
+\input{sections/conclusion}
+\input{sections/reproducibility}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

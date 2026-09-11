@@ -1,0 +1,13 @@
+\section{Limitations and Threats to Validity}
+\label{sec:limitations}
+
+\begin{itemize}
+  \item \textbf{No genuine multi-provider heterogeneity has been tested.} The \CapabilityAware{} and \QueueAware{} strategies' core mechanisms are keyed on a per-request provider label; every real-hardware run in this paper uses exactly one provider. Testing them properly requires a routing layer over multiple concurrently live provider instances with genuinely different capacity or capability, and a scenario that actually assigns different agents to different providers, neither of which we have built yet (Section~\ref{sec:scheduler-gate}).
+  \item \textbf{Full-node placement evidence predates these fixes.} The only full-node measurements available were collected before we knew the roster-size, batch-cap, and in-flight-cap corrections above mattered, and have not yet been rerun under corrected settings; we do not cite them as confirmatory in this draft.
+  \item \textbf{Three of five specified workload families cannot yet run on real inference.} The deterministic-kernel, synthetic-dependency-graph, and failure-injection families exist as tested, real implementations, but the harness that runs them currently accepts only a simulated provider by design; extending it to a real provider is unresolved.
+  \item \textbf{Content-addressable provenance is defined but not populated.} The provenance schema reserves fields for request, prompt, and response content hashes; no code path currently computes them. Provenance in this paper is by identity, version, and timing, not by content hash.
+  \item \textbf{Replay and recovery is unimplemented.} Checkpointing, resume-after-termination, and response replay do not exist. What exists today is determinism: two independent runs of the same specification produce identical trace signatures, a narrower guarantee.
+  \item \textbf{Atomic commit does not cover environment-state mutation.} The commit boundary covers one activation's agent-state update, outgoing messages, and emitted events; environment state, shared across agents within a tick, is applied as a separate, non-transactional batched step.
+  \item \textbf{Single model, single revision, 7--8B parameter class.} This is not a model-scaling study; our conclusions about reliability, autonomy, and scheduling are scoped to this model class until repeated at other scales.
+  \item Every non-claim in Section~\ref{sec:non-claims} applies throughout.
+\end{itemize}

@@ -1,0 +1,22 @@
+\section{Evaluation Methodology}
+\label{sec:methodology}
+
+\subsection{Systems}
+\label{sec:systems}
+
+We evaluate on two real, independently administered HPC systems with different accelerator vendors: one AMD-accelerator system (ROCm software stack) and one NVIDIA-accelerator system (CUDA software stack), each provisioning a single accelerator per evaluation job. We chose this pairing specifically to test portability across accelerator ecosystems rather than within one vendor's stack. Both systems run an identical, pinned instruction-tuned model revision at the 7--8B parameter scale, which we confirmed loads and serves real traffic on both platforms through a live health check rather than assuming compatibility from documentation.
+
+\subsection{Workloads}
+\label{sec:workloads}
+
+We evaluate two multi-role agentic coordination workloads end-to-end against real self-hosted inference on both systems: a disaster-response coordination task (4 roles) and a supply-chain coordination task (5 roles). We selected multi-role coordination specifically because it exercises message-mediated causal dependencies between distinct agent roles, which single-role or embarrassingly parallel workloads would not. Three further workload families in our evaluation plan, a deterministic minimum-dependency-graph kernel, synthetic dependency-graph shapes, and deterministic failure injection, exist as tested implementations with hand-derived structural invariants, but currently run only against simulated providers; the harness that runs them does not yet accept a real inference provider (Section~\ref{sec:limitations}).
+
+\subsection{Metrics}
+\label{sec:metrics}
+
+We report a reliability-aware useful-throughput metric, computed only from steps that pass all contracts rather than from raw request rate, together with per-request latency, a retained-autonomy rate (the fraction of committed behavior that is genuinely model-generated rather than policy-completed), and per-atom contract-violation counts across all four contract classes.
+
+\subsection{Statistical criterion}
+\label{sec:stats}
+
+Every contrast in this paper uses the same rule: mean useful-throughput plus or minus one standard deviation, with band overlap assessed across repeated runs. We report non-overlapping bands as a real effect and overlapping bands as statistically indistinguishable, never as ``probably about the same.'' Where a serving- or scheduling-parameter choice must be made among statistically tied candidates, the smaller, simpler value wins, by a rule fixed before any sweep was run. We increased the repetition count for a given comparison only when an initial result was ambiguous (overlapping bands close to the decision boundary) or when we needed to confirm that a reversal was real rather than an artifact of a small sample; Section~\ref{sec:b2-confound} and Section~\ref{sec:scheduler-gate} report each such escalation explicitly.

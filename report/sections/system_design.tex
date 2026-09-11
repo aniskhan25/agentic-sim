@@ -1,0 +1,123 @@
+\section{System Design}
+\label{sec:design}
+
+\subsection{Formal model}
+\label{sec:formal-model}
+
+We fix notation used throughout the rest of the paper. It describes precisely what the runtime computes; the propositions below are each labeled either \emph{immediate} (true by construction of the scheduling algorithm) or \emph{empirically verified} (checked by repeated real and synthetic execution, not proved).
+
+\paragraph{Events, activations, and agent state.}
+Let $\mathcal{Ag}$ be the set of agents. Agent $a \in \mathcal{Ag}$ has state $s_a^{(v)} \in \Sigma_a$ at version $v \in \mathbb{N}$, incremented monotonically on every applied mutation. An \textbf{event} $e \in \mathcal{E}$ (an environment tick, a delivered message, or an emitted side effect) triggers zero or more \textbf{activations}. An activation is a tuple
+\[
+\alpha = \langle a,\ e,\ r,\ p,\ k \rangle \in \mathcal{Ag} \times \mathcal{E} \times \mathrm{Reason} \times \mathbb{N} \times \mathbb{N},
+\]
+identified uniquely, with attempt number $k$ distinguishing a retry of the same logical activation from a new one. Executing $\alpha$ against a provider yields an \textbf{execution result}: a proposed state transition $s_a^{(v)} \to s_a^{(v+1)}$, a set of outgoing messages $M(\alpha) \subseteq \mathcal{M}$, and a set of emitted events $\mathrm{Ev}(\alpha) \subseteq \mathcal{E}$.
+
+\paragraph{Causal order.}
+We define $\prec$ (``happens-before'') as the smallest transitive relation on activations such that $\alpha \prec \alpha'$ whenever either (i)~some $m \in M(\alpha)$ triggers $\alpha'$ (a message-mediated dependency), or (ii)~some $e' \in \mathrm{Ev}(\alpha)$ triggers $\alpha'$ (an event-mediated dependency). Two activations are \textbf{causally independent}, written $\alpha_1 \parallel \alpha_2$, iff neither $\alpha_1 \prec \alpha_2$ nor $\alpha_2 \prec \alpha_1$.
+
+\paragraph{Causal readiness and wave decomposition.}
+At tick $t$, an activation is \emph{causally ready} iff its triggering event has occurred and every $\alpha'$ with $\alpha' \prec \alpha$ has already committed. Let $R_t$ be the set of activations ready for dispatch at $t$, and let $\prec_{R_t}$ be $\prec$ restricted to pairs both in $R_t$: a same-tick dependency can only arise from a message or event produced within $R_t$ itself, since any cross-tick parent has already committed and imposes no further wait. A \textbf{wave decomposition} of $R_t$ is the topological layering of $(R_t, \prec_{R_t})$:
+\[
+W_0 = \{\alpha \in R_t : \nexists\, \alpha' \in R_t,\ \alpha' \prec \alpha\}, \qquad
+W_i = \Big\{\alpha \in R_t \setminus \textstyle\bigcup_{j<i} W_j : \forall\, \alpha' \prec \alpha,\ \alpha' \in \textstyle\bigcup_{j<i} W_j\Big\}.
+\]
+By construction, $\forall\, \alpha_1, \alpha_2 \in W_i,\ \alpha_1 \parallel \alpha_2$, so a scheduling strategy may run every activation in one wave concurrently without violating $\prec$, provided it completes wave $W_i$ before starting $W_{i+1}$ (Figure~\ref{fig:wave-decomposition}).
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    node distance=13mm and 15mm,
+    act/.style={circle, draw=black, minimum size=8mm, font=\small},
+    wavebox/.style={draw=black!55, dashed, rounded corners, inner sep=6mm},
+    arr/.style={-{Latex[length=2mm]}, thick}
+]
+  \node[act] (a1) {$\alpha_1$};
+  \node[act, right=of a1] (a2) {$\alpha_2$};
+  \node[act, right=of a2] (a3) {$\alpha_3$};
+
+  \node[act, below=20mm of a1, xshift=6mm] (a4) {$\alpha_4$};
+  \node[act, below=20mm of a3, xshift=-6mm] (a5) {$\alpha_5$};
+
+  \draw[arr] (a1) -- (a4);
+  \draw[arr] (a2) -- (a4);
+  \draw[arr] (a2) -- (a5);
+  \draw[arr] (a3) -- (a5);
+
+  \begin{scope}[on background layer]
+    \node[wavebox, fit=(a1)(a2)(a3), label={[font=\small]above:Wave $W_0$}] (w0) {};
+    \node[wavebox, fit=(a4)(a5), label={[font=\small]below:Wave $W_1$}] (w1) {};
+  \end{scope}
+\end{tikzpicture}
+\caption{Wave decomposition of a ready set $R_t$. Activations within a wave (dashed boundary) are pairwise causally independent ($\alpha_i \parallel \alpha_j$) and may be dispatched concurrently; an arrow denotes a message- or event-mediated happens-before edge ($\prec$) into wave $W_1$. Wave $W_0$ must complete before wave $W_1$ is dispatched.}
+\label{fig:wave-decomposition}
+\end{figure}
+
+\begin{proposition}[wave-safety, immediate]
+\label{prop:wave-safety}
+Any scheduling strategy that dispatches concurrently only within a wave $W_i$, in wave order, preserves $\prec$ regardless of real execution latency variance. No ordering violation is possible, because by construction no two members of $W_i$ are $\prec$-comparable.
+\end{proposition}
+
+\begin{proposition}[single-wave collapse on today's workloads, empirically verified]
+\label{prop:single-wave}
+On every workload we evaluate, a message sent during tick $t$ can only be read starting tick $t+1$ at the earliest, so no activation in $R_t$ ever depends on another activation in $R_t$: $\forall\, t,\ W_0 = R_t$ (one wave). The \CausalOnly{} and \NaiveConcurrent{} strategies (Section~\ref{sec:ladder}) are therefore observationally equivalent (defined below) on both evaluated workloads today. They are distinguished only on a workload with genuine intra-tick dependencies, which neither workload evaluated here has (Section~\ref{sec:limitations}).
+\end{proposition}
+
+\paragraph{Observational equivalence.}
+Two executions $\pi_1, \pi_2$ of the same specification are observationally equivalent, $\pi_1 \sim \pi_2$, iff there is a bijection between their committed activations that preserves $\prec$, every agent-visible message's content, and every agent's final state version. We use $\sim$, not wall-clock replay, as the target of comparison throughout this paper: agreement on the committed causal graph up to reordering of $\parallel$-related activations.
+
+\begin{proposition}[no-write-conflict equivalence, empirically verified]
+\label{prop:no-conflict-equivalence}
+If no two causally independent activations write-conflict on shared environment state, then execution under the \Sequential{} strategy and execution under any wave-respecting concurrent strategy are observationally equivalent: $\pi_{\text{sequential}} \sim \pi_{\text{concurrent}}$. We checked this directly, not merely asserted it, on every non-conflict synthetic workload shape and on both real workloads: every scheduling strategy produces identical structural graph invariants and zero causal-verification violations.
+\end{proposition}
+
+\paragraph{Atomic commit.}
+A commit unit for activation $\alpha$ is $C(\alpha) = \langle \Delta s_a,\ M(\alpha),\ \mathrm{Ev}(\alpha),\ v_{\text{expected}} \rangle$. The commit transition is
+\[
+\mathrm{commit}: \Sigma \times C \to \Sigma \times \{\textsc{committed}, \textsc{duplicate}, \textsc{conflict}\},
+\]
+and it satisfies three properties. First, idempotence: if the activation was already committed, $\mathrm{commit}(\sigma, C(\alpha)) = (\sigma, \textsc{duplicate})$, so re-application is a no-op rather than a re-apply. Second, optimistic version safety: if $v_{\text{expected}} \ne$ agent $a$'s current version in $\sigma$, $\mathrm{commit}(\sigma, C(\alpha)) = (\sigma, \textsc{conflict})$ and $\sigma$ is unchanged. Third, all-or-nothing application: otherwise, $\Delta s_a$, $M(\alpha)$, and $\mathrm{Ev}(\alpha)$ are applied together or not at all. This scope, $\langle \Delta s_a, M(\alpha), \mathrm{Ev}(\alpha)\rangle$, does not include shared environment-state mutation in the current implementation (Section~\ref{sec:limitations}).
+
+\paragraph{Contracts.}
+A contract is a predicate over a proposed action, checked before commit:
+\begin{itemize}
+  \item $\mathrm{bounded}_B(\delta) \equiv |\delta| \le B$, a boundedness contract on a numeric delta;
+  \item $\mathrm{cardinality}(\mathrm{acts})$, true iff no (agent, action-type, target) triple is applied more than once per activation;
+  \item $\mathrm{must\_not}(\mathrm{act}, \Phi) \equiv \mathrm{act} \notin \Phi$, a hard prohibition against a declared forbidden set $\Phi$.
+\end{itemize}
+A step is \emph{semantically valid} iff its parsed proposal is well-formed and every active contract holds.
+
+\paragraph{Reliability metrics.}
+For a run with committed activations $A$, retained autonomy is
+$\rho = \frac{1}{|A|}\sum_{\alpha \in A} \mathbb{1}[\text{committed atoms of } \alpha \text{ are all genuinely model-proposed}]$
+(Section~\ref{sec:reliability-results}'s model autonomy rate). Usefulness is $u(\alpha) = \mathbb{1}[\alpha\text{'s commit succeeded and its result was semantically valid}]$, and throughput is $\frac{\sum_{\alpha \in A} u(\alpha)}{T_{\text{wall}}}$ (Section~\ref{sec:metrics}'s useful-throughput metric).
+
+\subsection{Observational semantics and activation identity}
+\label{sec:obs-semantics}
+
+The runtime implements the $\sim$-equivalence model above through three fixed representational choices: an activation representation with an explicit attempt number (formalized as $k$ above), a causal-parent chain over messages and events (formalizing $\prec$), and monotonically versioned agent and environment state (formalizing $v$). We compare two runs of the same specification by $\sim$, not by wall-clock replay.
+
+\subsection{Provider-neutral execution interface}
+\label{sec:exec-interface}
+
+We implement a narrow execution interface, a single batched-execution entry point, identically across a deterministic simulated provider, a rule-based provider, a synthetic-workload provider, and two real inference providers: one managed API endpoint and one self-hosted, OpenAI-API-compatible server. The self-hosted provider derives from the managed provider's fully generic request, response, repair, and provenance logic, and differs only in authentication and prefix-caching or context-length defaults. One shared conformance test suite exercises all providers, so no provider implementation can diverge from another undetected.
+
+\subsection{Contracts and per-atom provenance}
+\label{sec:contracts}
+
+Every proposed agent action passes through the contracts defined in Section~\ref{sec:formal-model}: a hard-prohibition contract, a boundedness contract, a cardinality contract, and an allowed-action-set contract. We count violations per atom rather than discard them. Every step produces a provenance record carrying activation identity, attempt number $k$, provider and model identity, causal parents, the state version read and written ($v \to v+1$), accelerator and serving-runtime identity, and an explicit configuration-mode label (common-denominator or platform-tuned, Section~\ref{sec:config-modes}). The provenance schema also reserves a content-hash field for the request and response, which no code path currently populates (Section~\ref{sec:limitations}).
+
+\subsection{Causal verification and atomic commit}
+\label{sec:causal-verification}
+
+An independent verification pass checks the message-mediated $\prec$-chain for duplicate activations, missing causal parents, cycles, and stale-read conflicts. We verified it reports zero violations on real executions of both workloads, and independently confirmed it detects each violation class when we deliberately constructed one. The state store implements the commit transition of Section~\ref{sec:formal-model} identically across two independent storage backends, checked by one shared conformance suite. Environment-state mutation remains outside $C(\alpha)$'s boundary and is applied as a separate batched step, a scoped, documented limitation rather than an oversight (Section~\ref{sec:limitations}).
+
+\subsection{Common-denominator and platform-tuned modes}
+\label{sec:config-modes}
+
+Every real evaluation run declares an explicit configuration-mode label: common-denominator, meaning identical serving configuration on both systems (the feature-parity intersection of what both platforms actually support), or platform-tuned, meaning independently selected per system through a frozen, preregistered selection procedure with a documented tie-break rule. Every reported effect is therefore attributable to a labeled configuration choice and never silently conflated with the other mode.
+
+\subsection{The scheduling-strategy ladder}
+\label{sec:ladder}
+
+We evaluate seven scheduling strategies, each strictly extending the wave-safety guarantee (Proposition~\ref{prop:wave-safety}) of the one before it with a further optimization: \Sequential{} (one activation at a time), \NaiveConcurrent{} (all of $R_t$ concurrent, no wave decomposition), \Barrier{} (waves as batching boundaries only), \CausalOnly{} (waves as defined in Section~\ref{sec:formal-model}, no further optimization), \CapabilityAware{} (dispatches a wave's group concurrently only if the target provider declares concurrency support), \QueueAware{} (adds a bounded per-provider in-flight cap $\kappa$), and \Full{} (adds role- and prefix-adjacent reordering within a group). All seven strategies conform to one common scheduling interface, so the simulation engine requires no changes to add a new strategy.

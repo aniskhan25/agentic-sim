@@ -1,0 +1,32 @@
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{Motivation}
+\label{sec:motivation}
+
+Large-scale agentic simulations increasingly run against real inference infrastructure: self-hosted model servers on HPC systems, managed API endpoints, and heterogeneous accelerator vendors, rather than a single fixed provider. Comparing scheduling or serving-configuration choices across such infrastructure is easy to get wrong in ways that look like a genuine finding. Under-provisioned concurrency, uncorrected tie-break defaults, and silent client-side batching ceilings can each independently produce a confident, statistically non-overlapping result that reverses once the actual bottleneck is identified. We present a runtime built to make this class of error visible and correctable, together with a worked example spanning three independent instances of exactly this failure mode, each diagnosed and fixed within the same investigation.
+
+\subsection{Research questions}
+\label{sec:rq}
+
+\begin{description}
+  \item[RQ1 (Portable semantics).] Can one simulation specification execute unchanged across heterogeneous inference and storage systems while preserving event dependencies, state transitions, and declared invariants?
+  \item[RQ2 (Safe concurrency).] How much parallelism can be extracted without changing the workload's declared observation projection or required happens-before relationships?
+  \item[RQ3 (Reliable generative execution).] How should a runtime distinguish model proposals from repaired, policy-completed, and fallback behavior, and how do those interventions affect reliability, autonomy, diversity, and cost?
+  \item[RQ4 (Infrastructure sensitivity).] Which workload and provider-capability properties determine effective scheduling and serving configurations across local, managed, AMD, and NVIDIA execution?
+\end{description}
+
+\subsection{Contribution hierarchy (as evaluated, not as hoped)}
+\label{sec:contributions}
+
+\begin{enumerate}
+  \item \textbf{Primary.} A provider-neutral activation, contract, and provenance model that makes model-generated, repaired, policy-completed, and fallback behavior, and their effect on reliability and autonomy, explicit and measurable, validated on two real, heterogeneous HPC systems (Section~\ref{sec:reliability-results}).
+  \item \textbf{Enabling mechanisms.} A causal activation graph and verifier, an atomic idempotent commit protocol, and a provider-neutral execution and dispatch interface, given a formal treatment in Section~\ref{sec:formal-model} (Section~\ref{sec:design}).
+  \item \textbf{Evidence.} Controlled, within-system workload measurements on both real systems, reported with explicit statistical criteria, including two full negative-result-then-correction investigations reported honestly rather than smoothed over (Section~\ref{sec:b2-confound} and Section~\ref{sec:scheduler-gate}).
+  \item \textbf{Evaluated, not claimed.} A capability-aware causal scheduler, tested against a decision gate preregistered before any real-load result existed. The gate is not cleared: full-strategy throughput is statistically tied to a causal-order-only baseline on both systems once we corrected three measurement confounds. We report why this is a workload-coverage limitation, not a negative finding about the mechanism (Section~\ref{sec:scheduler-gate} and Section~\ref{sec:limitations}).
+\end{enumerate}
+
+\subsection{What this paper does not claim}
+\label{sec:non-claims}
+
+We do not claim that a single job submitted to a batch scheduler is itself HPC-scale distributed computation, or that provider portability alone is novel. We do not claim that policy-completed behavior is model-generated, or that a shared endpoint gives controlled hardware measurements. We do not claim that one accelerator die and one whole accelerator are equivalent, that absolute cross-system differences isolate accelerator-vendor effects, or that the two workloads studied establish real-world domain validity on their own. Where we report a cross-system contrast, it is a within-system, normalized comparison, never an absolute cross-vendor ranking.
